@@ -1,0 +1,13 @@
+{
+  "name": "Neural Style Transfer",
+  "short_name": "Style Transfer",
+  "description": "Neural style transfer that runs entirely in your browser.",
+  "start_url": "style_transfer.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f5f1",
+  "theme_color": "#c2410c",
+  "icons": [
+    {"src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any"}
+  ]
+}
