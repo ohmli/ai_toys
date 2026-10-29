@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif&display=swap">
+<style>
+/* Layout: a wide plotting plate on the left, instruments (word card, analogy) stacked on the right.
+   Colour is reserved for the data; the interface itself is ink on cool paper. */
+:root {
+  --bg: #eef1f5;
+  --plate: #f8fafc;
+  --ink: #131a26;
+  --muted: #5b6676;
+  --line: #d3d9e2;
+  --grid: #e1e6ed;
+  --accent: #131a26;
+  --on-accent: #f8fafc;
+  --neg: #2f66d0;
+  --pos: #d4581f;
+  --c0: #0072b2; --c1: #d55e00; --c2: #009e73; --c3: #6a4c93;
+  --c4: #9a7b00; --c5: #c2338a; --c6: #8c564b; --c7: #5f6b7a;
+  --font-display: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1319; --plate: #161b23; --ink: #e8ecf2; --muted: #98a2b3; --line: #2a313c; --grid: #1c222b;
+    --accent: #e8ecf2; --on-accent: #0f1319; --neg: #5b8def; --pos: #f08a55;
+    --c0: #4da3e0; --c1: #f28c4a; --c2: #2fc49b; --c3: #a68ad6;
+    --c4: #d9b83a; --c5: #e86db5; --c6: #c29078; --c7: #9aa7b6;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1319; --plate: #161b23; --ink: #e8ecf2; --muted: #98a2b3; --line: #2a313c; --grid: #1c222b;
+  --accent: #e8ecf2; --on-accent: #0f1319; --neg: #5b8def; --pos: #f08a55;
+  --c0: #4da3e0; --c1: #f28c4a; --c2: #2fc49b; --c3: #a68ad6;
+  --c4: #d9b83a; --c5: #e86db5; --c6: #c29078; --c7: #9aa7b6;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.5;
+  padding-block: 24px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  margin: 0;
+}
+.wrap { max-width: 1260px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+header { display: flex; flex-direction: column; gap: 6px; max-width: 760px; }
+h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(34px, 5vw, 52px); line-height: 1.02; margin: 0; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 0; font-size: 15px; max-width: 62ch; }
+.note { margin: 0; color: var(--muted); font-size: 12.5px; max-width: 70ch; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 372px; gap: 20px; align-items: start; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+.stage, .card { background: var(--plate); border: 1px solid var(--line); border-radius: 6px; min-width: 0; }
+.stage { display: flex; flex-direction: column; }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; padding: 12px; border-bottom: 1px solid var(--line); }
+.seg { display: inline-flex; border: 1px solid var(--ink); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; background: transparent; color: var(--ink); font: 500 13px var(--font-body); padding: 6px 12px; cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--ink); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+.spacer { flex: 1 1 0; }
+input[type="search"], select {
+  font: 400 13px var(--font-body); color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 4px; padding: 6px 8px; min-width: 0;
+}
+input[type="search"] { width: 170px; }
+.tools { display: inline-flex; gap: 4px; }
+.tools button, .chip {
+  font: 500 12.5px var(--font-body); color: var(--ink); background: transparent; border: 1px solid var(--line);
+  border-radius: 4px; padding: 5px 9px; cursor: pointer;
+}
+.tools button { min-width: 32px; }
+.tools button:hover, .chip:hover { border-color: var(--ink); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.axes-ui { display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.axes-ui .row { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: center; }
+.axes-ui .lab { font: 500 11px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); min-width: 64px; }
+.arrow { color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.canvaswrap { position: relative; height: clamp(420px, 62vw, 640px); background: var(--plate); }
+canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+canvas.hit { cursor: pointer; }
+#tip {
+  position: absolute; pointer-events: none; padding: 5px 8px; background: var(--ink); color: var(--bg);
+  font: 400 12px var(--font-body); border-radius: 4px; white-space: nowrap; display: none; z-index: 2;
+}
+#tip b { font-weight: 600; }
+#tip span { font-family: var(--font-mono); opacity: .8; margin-left: 6px; }
+.caption { padding: 10px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12.5px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.legend button {
+  display: inline-flex; gap: 6px; align-items: center; font: 400 12.5px var(--font-body); color: var(--ink);
+  background: transparent; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px 3px 8px; cursor: pointer;
+}
+.legend button[aria-pressed="false"] { opacity: .4; text-decoration: line-through; }
+.side { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.card { padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.eyebrow { font: 500 11px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0; }
+.wordhead { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wordhead h2 { font-family: var(--font-display); font-weight: 400; font-size: 40px; line-height: 1; margin: 0; }
+.cat { display: inline-flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted); }
+svg.shape { width: 12px; height: 12px; flex: none; overflow: visible; }
+.nb { display: flex; flex-direction: column; }
+.nb button {
+  display: grid; grid-template-columns: 14px minmax(70px, 1fr) minmax(40px, 90px) 38px; gap: 8px; align-items: center;
+  background: transparent; border: 0; border-top: 1px solid var(--line); padding: 6px 2px; cursor: pointer;
+  font: 400 13.5px var(--font-body); color: var(--ink); text-align: left;
+}
+.nb button:first-child { border-top: 0; }
+.nb button:hover { background: var(--bg); }
+.bar-track { height: 6px; background: var(--grid); border-radius: 1px; }
+.bar-fill { height: 100%; background: var(--ink); border-radius: 1px; }
+.val { font: 400 12px var(--font-mono); color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.strips { display: flex; flex-direction: column; gap: 6px; }
+.strip-row { display: grid; grid-template-columns: 70px minmax(0, 1fr); gap: 8px; align-items: center; font-size: 12px; }
+.strip-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strip-row canvas { width: 100%; height: 22px; cursor: default; }
+.sentence { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; font-size: 14px; }
+.sentence select, .sentence input { max-width: 112px; }
+.answer { font-family: var(--font-display); font-size: 30px; line-height: 1; padding-inline: 2px; color: var(--pos); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.results { gap: 14px; }
+.res-top { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.avg { display: flex; align-items: baseline; gap: 8px; }
+.avg b { font: 400 44px/1 var(--font-display); font-variant-numeric: tabular-nums; }
+.avg span { color: var(--muted); font-size: 12.5px; }
+.dist { display: flex; flex-direction: column; gap: 6px; max-width: 520px; }
+.drow { display: grid; grid-template-columns: 34px minmax(0, 1fr) 30px; gap: 10px; align-items: center; font-size: 12.5px; }
+.drow .bar-fill { background: var(--pos); }
+.drow .val { font-variant-numeric: tabular-nums; }
+.res-list { display: flex; flex-direction: column; max-height: 260px; overflow-y: auto; }
+.rrow { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); font-size: 12.5px; }
+.rrow .when { color: var(--muted); font-variant-numeric: tabular-nums; }
+.rrow .st { color: var(--pos); letter-spacing: 1px; }
+.rate { flex-direction: row; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 24px; }
+.stars { display: flex; gap: 4px; }
+.stars button { background: transparent; border: 0; padding: 4px; cursor: pointer; line-height: 0; border-radius: 6px; }
+.stars svg { width: 30px; height: 30px; fill: none; stroke: var(--muted); stroke-width: 1.6; stroke-linejoin: round; transition: fill .12s, stroke .12s, transform .12s; }
+.stars button.on svg { fill: var(--pos); stroke: var(--pos); }
+.stars button:hover svg { transform: scale(1.12); }
+.stars button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.fine { color: var(--muted); font-size: 12px; margin: 0; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+.train { display: flex; flex-wrap: wrap; gap: 10px 12px; align-items: center; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+.go { font: 500 13px var(--font-body); background: var(--accent); color: var(--on-accent); border: 1px solid var(--accent); border-radius: 4px; padding: 6px 14px; cursor: pointer; }
+.go:disabled { opacity: .5; cursor: default; }
+.meter { flex: 1 1 140px; height: 8px; background: var(--grid); border-radius: 4px; overflow: hidden; }
+#meterfill { height: 100%; width: 0; background: var(--c2); transition: width .15s linear; }
+#trainstat { font: 400 12px var(--font-mono); color: var(--muted); min-width: 190px; }
+.duo { display: flex; flex-direction: column; gap: 5px; flex: 1 1 260px; min-width: 220px; }
+.mrow { display: grid; grid-template-columns: 74px minmax(0, 1fr) 92px; gap: 8px; align-items: center; font-size: 12.5px; }
+.mrow .meter { flex: none; }
+#meterfill2 { height: 100%; width: 0; background: var(--c1); transition: width .15s linear; }
+#meterfill3, #meterfill4 { height: 100%; width: 0; transition: width .15s linear; }
+#meterfill3 { background: var(--c3); }
+#meterfill4 { background: var(--c5); }
+#trainstat { flex: 1 1 100%; min-width: 0; }
+.dial { display: flex; align-items: center; gap: 10px; font: 500 12.5px var(--font-body); }
+.dial .val { min-width: 44px; text-align: left; color: var(--ink); }
+.dial input[type="range"] { -webkit-appearance: none; appearance: none; width: 150px; height: 6px; border-radius: 3px; background: var(--grid); cursor: pointer; margin: 0; }
+.dial input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); border: 3px solid var(--plate); box-shadow: 0 0 0 1px var(--ink); }
+.dial input[type="range"]::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--accent); border: 3px solid var(--plate); box-shadow: 0 0 0 1px var(--ink); }
+.log { max-height: 340px; overflow-y: auto; display: flex; flex-direction: column; border-top: 1px solid var(--line); }
+.log-row { display: grid; grid-template-columns: 82px minmax(0, 1fr); gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; line-height: 1.4; }
+.tag { display: inline-flex; gap: 6px; align-items: baseline; font: 500 10.5px var(--font-mono); letter-spacing: .05em; text-transform: uppercase; }
+.tag::before { content: ""; width: 8px; height: 8px; flex: none; background: var(--c0); border-radius: 50%; transform: translateY(0.5px); }
+.tag.crit::before { background: var(--c1); border-radius: 1px; }
+.tag.ana::before { background: var(--c3); border-radius: 1px; transform: rotate(45deg); }
+.tag.jdg::before { background: var(--c5); border-radius: 1px; }
+.stp { font: 400 11px var(--font-mono); color: var(--muted); white-space: nowrap; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>Word Map</h1>
+    <p class="lede" id="wordcount-text">3,000 words, each stored as a list of 48 numbers. Flatten them to a plane and words that behave alike land together. Pick a word to see its neighbours, or solve an analogy by vector arithmetic or with the Analogist.</p>
+    <p class="note">Every word starts as pure random noise, so the map is a meaningless cloud. Four models train nonstop, in two pairs. An <b>Organizer</b> rearranges the words while a <b>Critic</b> neural net checks that related words really belong together. An <b>Analogist</b> learns to answer analogies while a <b>Judge</b> neural net rules on whether each answer is right. Watch all four improve.</p>
+  </header>
+
+  <div class="grid">
+    <section class="stage" aria-label="Embedding plot">
+      <div class="bar">
+        <div class="seg" role="group" aria-label="Projection">
+          <button type="button" data-mode="pca" aria-pressed="true">PCA</button>
+          <button type="button" data-mode="tsne" aria-pressed="false">t-SNE</button>
+          <button type="button" data-mode="axes" aria-pressed="false">Custom axes</button>
+        </div>
+        <div class="spacer"></div>
+        <input type="search" id="search" list="wordlist" placeholder="Find a word" aria-label="Find a word" autocomplete="off">
+        <datalist id="wordlist"></datalist>
+        <div class="tools">
+          <button type="button" id="zin" aria-label="Zoom in">+</button>
+          <button type="button" id="zout" aria-label="Zoom out">&minus;</button>
+          <button type="button" id="zreset" aria-label="Reset view">Reset</button>
+        </div>
+      </div>
+      <div class="train">
+        <div class="duo">
+          <div class="mrow"><span>Organizer</span><div class="meter"><div id="meterfill"></div></div><span class="val" id="orgval"></span></div>
+          <div class="mrow"><span>Critic</span><div class="meter"><div id="meterfill2"></div></div><span class="val" id="crival"></span></div>
+          <div class="mrow"><span>Analogist</span><div class="meter"><div id="meterfill3"></div></div><span class="val" id="anaval"></span></div>
+          <div class="mrow"><span>Judge</span><div class="meter"><div id="meterfill4"></div></div><span class="val" id="judval"></span></div>
+        </div>
+        <label class="dial">Speed
+          <input type="range" id="speed" min="0" max="100" value="50" aria-label="Training speed">
+          <span class="val" id="speedval">1.0&times;</span>
+        </label>
+        <span id="trainstat" aria-live="polite"></span>
+      </div>
+      <div class="axes-ui" id="axesui" hidden>
+        <div class="row"><span class="lab">Presets</span><div class="chips" id="axpresets"></div></div>
+        <div class="row"><span class="lab">X axis</span><select id="x1" aria-label="X axis from"></select><span class="arrow">&rarr;</span><select id="x2" aria-label="X axis to"></select></div>
+        <div class="row"><span class="lab">Y axis</span><select id="y1" aria-label="Y axis from"></select><span class="arrow">&rarr;</span><select id="y2" aria-label="Y axis to"></select></div>
+      </div>
+      <div class="canvaswrap" id="cw">
+        <canvas id="plot" role="img" aria-label="Scatter plot of word vectors. Use the search box or the neighbour list to explore without a pointer."></canvas>
+        <div id="tip"></div>
+      </div>
+      <div class="caption" id="caption"></div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <aside class="side">
+      <section class="card" id="wordcard" aria-live="polite"></section>
+      <section class="card" id="analogy">
+        <p class="eyebrow">Analogy</p>
+        <div class="sentence">
+          <input type="search" id="aa" list="wordlist" aria-label="A" autocomplete="off" spellcheck="false"><span>is to</span><input type="search" id="ab" list="wordlist" aria-label="B" autocomplete="off" spellcheck="false">
+          <span>as</span><input type="search" id="ac" list="wordlist" aria-label="C" autocomplete="off" spellcheck="false"><span>is to</span><span class="answer" id="aans">?</span>
+        </div>
+        <div class="chips" id="apresets"></div>
+        <p class="eyebrow">Two solvers, scored by the Judge</p>
+        <div class="nb" id="aiverdict"></div>
+        <p class="eyebrow">Closest words to B &minus; A + C</p>
+        <div class="nb" id="alist"></div>
+        <p class="fine">Vector arithmetic computes B &minus; A + C, then ranks words by cosine similarity. The Analogist is a neural net that learns to predict the answer on its own; the bar shows how likely the Judge thinks each answer is right. Arrows are drawn on the current layout, so they look parallel only where the layout keeps that direction.</p>
+      </section>
+    </aside>
+  </div>
+
+  <section class="card rate" id="rate" aria-labelledby="rate-h">
+    <div>
+      <p class="eyebrow" id="rate-h">Rate this page</p>
+      <p class="fine" id="rate-msg">How good is this visualizer? Pick 1 to 5 stars.</p>
+    </div>
+    <div class="stars" id="stars" role="radiogroup" aria-labelledby="rate-h"></div>
+    <button type="button" class="chip" id="stats-toggle" aria-expanded="false" aria-controls="results">Rating &amp; visitor stats</button>
+  </section>
+  <section class="card results" id="results" aria-labelledby="res-h" hidden>
+    <p class="eyebrow" id="res-h">Rating &amp; visitor stats</p>
+    <div class="res-top"><div class="avg"><b id="res-avg">&ndash;</b><span>out of 5</span></div><p class="fine" id="res-count">Loading&hellip;</p></div>
+    <div class="dist" id="res-dist"></div>
+    <div class="res-top"><div class="avg"><b id="res-vis">&ndash;</b><span>visitors</span></div><div class="avg"><b id="res-visits">&ndash;</b><span>page loads</span></div><button type="button" class="chip" id="res-refresh">Refresh</button></div>
+    <p class="fine">Counts are kept on a free public counter service (Abacus). Visitors are counted once per browser. Open this page with #stats on the end of the address to jump straight here.</p>
+  </section>
+</div>
+
+<script>
+const DIM = 48;
+const CATS = [
+  { id: 'people', name: 'People' }, { id: 'animals', name: 'Animals' }, { id: 'countries', name: 'Countries' },
+  { id: 'capitals', name: 'Capitals' }, { id: 'verbs', name: 'Verbs' }, { id: 'colors', name: 'Colours' },
+  { id: 'food', name: 'Food & Drink' }, { id: 'vehicles', name: 'Vehicles' }
+];
+
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+function buildWords() {
+  const rand = mulberry32(20261019);
+  const gauss = () => { let u = 0; while (!u) u = rand(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * rand()); };
+  const store = new Map();
+  const concept = n => {
+    if (!store.has(n)) {
+      const v = new Float64Array(DIM); let s = 0;
+      for (let i = 0; i < DIM; i++) { v[i] = gauss(); s += v[i] * v[i]; }
+      s = Math.sqrt(s); for (let i = 0; i < DIM; i++) v[i] /= s;
+      store.set(n, v);
+    }
+    return store.get(n);
+  };
+  const words = [];
+  const add = (w, cat, parts) => {
+    const v = new Float64Array(DIM);
+    for (const p of parts) {
+      const [name, wt] = Array.isArray(p) ? p : [p, 1];
+      const c = concept(name);
+      for (let i = 0; i < DIM; i++) v[i] += wt * c[i];
+    }
+    const nz = concept('~' + w);
+    for (let i = 0; i < DIM; i++) v[i] += 0.3 * nz[i];
+    words.push({ w, cat, ci: CATS.findIndex(c => c.id === cat), v });
+  };
+
+  // Expanded People (Royalty, Family, Professions, Ages, Fantasy/Mythos)
+  const people = [
+    ['man','male'],['woman','female'],['boy','male','young'],['girl','female','young'],
+    ['king','male','royal'],['queen','female','royal'],['prince','male','royal','young'],['princess','female','royal','young'],
+    ['emperor','male','royal'],['empress','female','royal'],['duke','male','royal'],['duchess','female','royal'],
+    ['father','male','parent'],['mother','female','parent'],['uncle','male','relative'],['aunt','female','relative'],
+    ['brother','male','sibling'],['sister','female','sibling'],['son','male','child'],['daughter','female','child'],
+    ['grandfather','male','parent','old'],['grandmother','female','parent','old'],['nephew','male','relative'],['niece','female','relative'],
+    ['actor','male','actor'],['actress','female','actor'],['hero','male','hero'],['heroine','female','hero'],
+    ['waiter','male','service'],['waitress','female','service'],['monk','male','religion'],['nun','female','religion'],
+    ['wizard','male','magic'],['witch','female','magic'],['lord','male','nobility'],['lady','female','nobility'],
+    ['knight','male','warrior'],['warrior','warrior'],['archer','warrior'],['guard','security'],
+    ['doctor','professional'],['nurse','professional'],['teacher','professional'],['student','young','school'],
+    ['scientist','professional'],['engineer','professional'],['artist','creative'],['chef','service'],
+    ['husband','male','spouse'],['wife','female','spouse'],['groom','male','wedding'],['bride','female','wedding'],
+    ['grandson','male','child','young'],['granddaughter','female','child','young'],['baron','male','nobility'],['baroness','female','nobility'],
+    ['count','male','nobility'],['countess','female','nobility'],['sultan','male','royal'],['sultana','female','royal'],
+    ['pilot','professional'],['lawyer','professional'],['farmer','professional'],['judge','professional'],['mayor','professional'],
+    ['dentist','professional'],['astronaut','professional'],['baker','service'],['sailor','service'],['gardener','service'],
+    ['singer','creative'],['dancer','creative'],['painter','creative'],['writer','creative'],['poet','creative'],['musician','creative'],
+    ['soldier','warrior'],['pirate','warrior'],['detective','security']
+  ];
+  for (const [w, ...a] of people) add(w, 'people', [['@person', 1.4], ...a]);
+
+  // Expanded Animals (Mammals, Birds, Young, Aquatic, Domestic, Insects/Reptiles)
+  const animals = [
+    ['dog','dog'],['puppy','dog','young'],['cat','cat'],['kitten','cat','young'],['horse','horse'],['foal','horse','young'],['stallion','horse','male'],['mare','horse','female'],
+    ['sheep','sheep'],['lamb','sheep','young'],['cow','cow','female'],['bull','cow','male'],['calf','cow','young'],
+    ['lion','lion','male'],['lioness','lion','female'],['cub','lion','young'],['tiger','tiger','male'],['tigress','tiger','female'],
+    ['hen','chicken','female'],['rooster','chicken','male'],['chick','chicken','young'],['duck','duck'],['duckling','duck','young'],
+    ['bear','bear'],['wolf','wolf'],['fox','fox'],['rabbit','rabbit'],['deer','deer'],['elephant','wild'],['giraffe','wild'],
+    ['monkey','wild'],['penguin','bird'],['eagle','bird'],['owl','bird'],['dolphin','ocean'],['whale','ocean'],['shark','ocean'],
+    ['zebra','wild'],['kangaroo','wild'],['koala','wild'],['panda','wild'],['leopard','wild'],['cheetah','wild'],
+    ['snake','reptile'],['lizard','reptile'],['turtle','reptile'],['frog','amphibian'],
+    ['bee','insect'],['butterfly','insect'],['spider','arachnid'],['ant','insect'],
+    ['goat','goat'],['kid','goat','young'],['pig','pig'],['piglet','pig','young'],['boar','pig','male'],['sow','pig','female'],
+    ['donkey','donkey'],['camel','wild'],['hippo','wild'],['rhino','wild'],['gorilla','wild'],['chimpanzee','wild'],['otter','wild'],
+    ['hedgehog','wild'],['raccoon','wild'],['squirrel','rodent'],['mouse','rodent'],['rat','rodent'],['hamster','rodent'],['beaver','rodent'],
+    ['moose','deer'],['antelope','deer'],['buffalo','cow'],['goose','duck'],['swan','duck'],['parrot','bird'],['sparrow','bird'],
+    ['crow','bird'],['hawk','bird'],['flamingo','bird'],['octopus','ocean'],['crab','ocean'],['seal','ocean'],['salmon','fish'],
+    ['trout','fish'],['goldfish','fish'],['crocodile','reptile'],['gecko','reptile'],['cobra','reptile'],['toad','amphibian'],
+    ['wasp','insect'],['beetle','insect'],['mosquito','insect'],['dragonfly','insect'],['scorpion','arachnid']
+  ];
+  for (const [w, sp, ...a] of animals) add(w, 'animals', [['@animal', 1.4], ['sp_' + sp, 1.2], ...a]);
+
+  // Expanded Country / Capital Pairs
+  const pairs = [
+    ['france','paris'],['germany','berlin'],['italy','rome'],['japan','tokyo'],['spain','madrid'],
+    ['china','beijing'],['egypt','cairo'],['russia','moscow'],['canada','ottawa'],['greece','athens'],
+    ['ukraine','kyiv'],['brazil','brasilia'],['mexico','mexico city'],['india','new delhi'],['australia','canberra'],
+    ['portugal','lisbon'],['sweden','stockholm'],['norway','oslo'],['thailand','bangkok'],['argentina','buenos aires'],['turkey','ankara'],
+    ['south korea','seoul'],['united kingdom','london'],['united states','washington'],['switzerland','bern'],['netherlands','amsterdam'],
+    ['poland','warsaw'],['finland','helsinki'],['denmark','copenhagen'],['ireland','dublin'],['new zealand','wellington'],
+    ['chile','santiago'],['colombia','bogota'],['peru','lima'],['vietnam','hanoi'],['indonesia','jakarta'],
+    ['austria','vienna'],['belgium','brussels'],['hungary','budapest'],['czechia','prague'],['romania','bucharest'],['bulgaria','sofia'],
+    ['serbia','belgrade'],['croatia','zagreb'],['iceland','reykjavik'],['kenya','nairobi'],['nigeria','abuja'],['ethiopia','addis ababa'],
+    ['ghana','accra'],['morocco','rabat'],['tunisia','tunis'],['algeria','algiers'],['iran','tehran'],['iraq','baghdad'],
+    ['israel','jerusalem'],['saudi arabia','riyadh'],['pakistan','islamabad'],['bangladesh','dhaka'],['nepal','kathmandu'],
+    ['philippines','manila'],['malaysia','kuala lumpur'],['cuba','havana'],['venezuela','caracas'],['ecuador','quito'],
+    ['bolivia','la paz'],['uruguay','montevideo'],['mongolia','ulaanbaatar'],['kazakhstan','astana'],['estonia','tallinn'],
+    ['latvia','riga'],['lithuania','vilnius']
+  ];
+  for (const [c, cap] of pairs) {
+    add(c, 'countries', [['@country', 1.4], ['k_' + c, 1.2]]);
+    add(cap, 'capitals', [['@city', 1.4], ['k_' + c, 1.2], ['capital_of', 1.2]]);
+  }
+
+  // Expanded Verbs (Base vs Past Tense)
+  const verbs = [
+    ['walk','walked'],['run','ran'],['jump','jumped'],['swim','swam'],['eat','ate'],['drink','drank'],
+    ['write','wrote'],['read','read_past'],['sing','sang'],['play','played'],['speak','spoke'],['fly','flew'],
+    ['sleep','slept'],['drive','drove'],['think','thought'],['buy','bought'],['teach','taught'],['build','built'],
+    ['see','saw'],['catch','caught'],['break','broke'],['fall','fell'],['give','gave'],
+    ['cook','cooked'],['paint','painted'],['clean','cleaned'],['open','opened'],['close','closed'],['start','started'],
+    ['finish','finished'],['listen','listened'],['talk','talked'],['work','worked'],['study','studied'],['travel','traveled'],
+    ['dance','danced'],['laugh','laughed'],['cry','cried'],['smile','smiled'],['push','pushed'],['pull','pulled'],['kick','kicked'],
+    ['throw','threw'],['send','sent'],['tell','told'],['know','knew'],['grow','grew'],['draw','drew'],['wear','wore'],['sit','sat'],
+    ['stand','stood'],['win','won'],['lose','lost'],['sell','sold'],['pay','paid'],['hide','hid'],['ride','rode'],['climb','climbed'],
+    ['wash','washed'],['plant','planted'],['visit','visited'],['call','called'],['watch','watched'],['help','helped']
+  ];
+  for (const [p, q] of verbs) {
+    add(p, 'verbs', [['@verb', 1.4], ['v_' + p, 1.2]]);
+    add(q, 'verbs', [['@verb', 1.4], ['v_' + p, 1.2], ['past', 1.2]]);
+  }
+
+  // Expanded Colours
+  const colors = [
+    ['red','warm'],['orange','warm'],['yellow','warm','light'],['green','cool'],['blue','cool'],['purple','cool'],
+    ['pink','warm','light'],['black','dark'],['white','light'],['gray'],['brown','warm','dark'],
+    ['cyan','cool','light'],['magenta','warm'],['teal','cool'],['gold','warm','light'],['silver','light'],['maroon','dark','warm'],
+    ['navy','cool','dark'],['lime','light','cool'],['indigo','cool','dark'],['violet','cool'],['coral','warm','light'],['beige','light','warm'],
+    ['crimson','warm','dark'],['scarlet','warm'],['turquoise','cool','light'],['lavender','cool','light'],['olive','dark'],
+    ['mint','cool','light'],['tan','warm','light'],['rose','warm'],['amber','warm'],['ivory','light'],['charcoal','dark'],
+    ['lilac','cool','light'],['burgundy','dark','warm'],['azure','cool'],['emerald','cool','dark']
+  ];
+  for (const [w, ...a] of colors) add(w, 'colors', [['@color', 1.4], ['c_' + w, 1.0], ...a.map(x => [x, 0.8])]);
+
+  // Expanded Food & Drink
+  const food = {
+    fruit: ['apple','banana','pear','grape','orange_fruit','strawberry','lemon','peach','cherry','mango','pineapple','watermelon','blueberry','kiwi','plum','apricot','pomegranate','papaya','coconut','fig','melon','grapefruit','raspberry','blackberry','avocado'],
+    drink: ['coffee','tea','milk','juice','water','wine','beer','soda','smoothie','lemonade','hot chocolate','cocoa','espresso','latte','cider','whiskey','vodka','champagne','milkshake'],
+    baked: ['bread','cake','cookie','pie','donut','croissant','muffin','bagel','brownie','waffle','pancake','pretzel','scone','toast','cupcake','biscuit'],
+    meal: ['pizza','pasta','rice','soup','burger','salad','steak','sushi','taco','sandwich','curry','burrito','lasagna','noodles','dumpling','omelette','sausage','bacon','fries','ramen','pho','falafel','kebab','paella','risotto','stew','nachos'],
+    veg: ['carrot','potato','onion','broccoli','spinach','corn','cucumber','garlic','mushroom','lettuce','cabbage','tomato']
+  };
+  for (const g in food) for (const w of food[g]) add(w.replace('_fruit',''), 'food', [['@food', 1.4], [g, 0.9]]);
+
+  // Expanded Vehicles
+  const veh = {
+    road: ['car','bus','truck','bicycle','motorcycle','van','taxi','scooter','ambulance','firetruck','limousine','pickup','jeep','minivan','tractor','bulldozer','wagon','rickshaw','skateboard'],
+    rail: ['train','tram','subway','monorail','locomotive','trolley','cable car','metro','bullet train','freight train'],
+    air: ['plane','helicopter','rocket','jet','balloon','drone','glider','airship','spaceship','satellite','parachute','blimp','biplane'],
+    water: ['boat','ship','submarine','yacht','ferry','canoe','raft','kayak','tugboat','sailboat','speedboat','gondola','jet ski']
+  };
+  for (const g in veh) for (const w of veh[g]) add(w, 'vehicles', [['@vehicle', 1.4], [g, 0.9]]);
+
+  // ---- Expansion to 3,000 words ----
+  const seen = new Set(words.map(x => x.w)), FAMS = [], NP = [];
+  const L = s => s.trim().split(/\s+/).filter(x => !x.endsWith('_')).map(x => x.replace(/_/g, ' '));
+  const addNew = (w, cat, parts) => { if (seen.has(w)) return false; seen.add(w); add(w, cat, parts); return true; };
+  const grp = (cat, root, spec, wt) => { for (const k in spec) for (const w of L(spec[k])) addNew(w, cat, [[root, 1.4], [k, wt || 1.1]]); };
+
+  // People: gendered pairs
+  for (const pr of L('policeman/policewoman businessman/businesswoman chairman/chairwoman salesman/saleswoman host/hostess steward/stewardess heir/heiress master/mistress god/goddess giant/giantess prophet/prophetess widower/widow bachelor/spinster sir/madam priest/priestess tsar/tsarina rajah/rani usher/usherette hunter/huntress sorcerer/sorceress enchanter/enchantress shepherd/shepherdess landlord/landlady godfather/godmother godson/goddaughter stepfather/stepmother stepson/stepdaughter stepbrother/stepsister papa/mama dad/mom grandpa/grandma boyfriend/girlfriend fisherman/fisherwoman horseman/horsewoman cowboy/cowgirl schoolboy/schoolgirl nobleman/noblewoman headmaster/headmistress patron/matron manservant/maidservant gentleman/gentlewoman fiance/fiancee bridegroom/bridesmaid fireman/firewoman spokesman/spokeswoman congressman/congresswoman anchorman/anchorwoman craftsman/craftswoman statesman/stateswoman sportsman/sportswoman foreman/forewoman bartender/barmaid caveman/cavewoman viscount/viscountess marquis/marchioness')) {
+    const [m, f] = pr.split('/'); NP.push([m, f]); if (!f ) continue;
+    addNew(m, 'people', [['@person', 1.4], 'male', ['pr_' + m, 1.2]]); addNew(f, 'people', [['@person', 1.4], 'female', ['pr_' + m, 1.2]]);
+  }
+  grp('people', '@person', {
+    job_medical: 'surgeon obstetrician paramedic pharmacist therapist psychologist psychiatrist veterinarian midwife dietitian radiologist cardiologist pediatrician optometrist chiropractor physician anesthetist orderly caregiver dermatologist neurologist oncologist counselor physiotherapist paramedic_ medic',
+    job_legal: 'attorney prosecutor barrister solicitor magistrate juror clerk notary arbitrator paralegal bailiff sheriff marshal inspector constable commissioner warden jailer ranger coroner sergeant officer deputy',
+    job_education: 'professor lecturer tutor principal headmaster_ librarian counselor_ scholar academic researcher dean instructor coach trainer mentor schoolteacher kindergartener graduate undergraduate pupil apprentice intern fellow',
+    job_trades: 'plumber electrician carpenter mason welder mechanic roofer plasterer bricklayer locksmith blacksmith tailor seamstress cobbler weaver potter glazier tiler painter_decorator machinist miner carpenter_ sawyer cooper tanner thatcher stonecutter jeweler watchmaker upholsterer',
+    job_tech: 'programmer developer hacker analyst architect designer technician administrator webmaster coder tester operator mathematician statistician cryptographer roboticist inventor technologist',
+    job_business: 'manager director executive accountant banker broker cashier clerk_ consultant secretary receptionist entrepreneur investor trader merchant retailer auditor supervisor employer employee boss colleague salesperson marketer advisor agent tycoon shopkeeper vendor dealer peddler wholesaler',
+    job_science: 'physicist chemist biologist geologist astronomer botanist zoologist ecologist meteorologist biochemist geneticist anthropologist archaeologist historian philosopher economist sociologist linguist naturalist explorer oceanographer volcanologist paleontologist',
+    job_media: 'journalist reporter editor photographer filmmaker producer announcer broadcaster presenter columnist blogger cartoonist illustrator novelist playwright screenwriter critic narrator publisher biographer essayist translator interpreter',
+    job_arts: 'composer conductor pianist violinist guitarist drummer cellist flutist trumpeter saxophonist bassist vocalist rapper comedian magician juggler acrobat clown sculptor architect_ choreographer ballerina director_ model stuntman puppeteer storyteller bard minstrel',
+    job_sports: 'athlete runner sprinter swimmer boxer wrestler gymnast cyclist skier skater golfer tennis_player footballer goalkeeper striker pitcher batter catcher quarterback referee umpire jockey surfer climber fencer archer_ champion captain rower diver',
+    job_service: 'barista bartender butler maid janitor porter courier driver chauffeur cleaner babysitter nanny housekeeper concierge attendant bellhop cashier_ hairdresser barber florist grocer butcher fishmonger postman lifeguard bodyguard cook gardener_ valet servant doorman',
+    job_military: 'general admiral colonel captain_ major lieutenant corporal private commander sergeant_ cadet recruit veteran commando sniper paratrooper marine ranger_ gunner cavalry infantry spy scout',
+    job_gov: 'president senator governor minister ambassador diplomat politician mayor_ chancellor premier delegate councilor legislator candidate voter citizen ruler monarch regent consul envoy official bureaucrat',
+    job_religion: 'bishop cardinal pope pastor rabbi imam chaplain deacon missionary preacher prophet_ saint pilgrim abbot monk_ druid shaman minister_ clergyman vicar apostle disciple',
+    job_farm: 'rancher shepherd_ herder fisher lumberjack woodcutter beekeeper vintner brewer miller harvester gardener_ forester trapper hunter_ blacksmith_ stablehand cowhand',
+    job_transport: 'captain_ navigator conductor engineer_ brakeman motorist cabbie trucker mariner skipper boatman helmsman deckhand airman stewardess_ copilot dispatcher',
+    kin: 'parent child sibling twin cousin spouse relative ancestor descendant orphan infant baby toddler teenager adult elder senior youth newborn guardian stepparent in-law grandchild grandparent great-grandfather',
+    social: 'friend neighbor stranger guest visitor customer client patient tourist traveler immigrant native villager townsman citizen_ peasant commoner noble aristocrat outlaw bandit thief robber criminal victim witness suspect rebel traitor patriot refugee hostage prisoner',
+    fantasy: 'elf dwarf goblin orc troll dragon_rider fairy giant_ ogre gnome sprite mermaid vampire werewolf zombie ghost demon angel genie centaur sorcerer_ paladin ranger_ rogue bard_ necromancer alchemist druid_ hobbit wraith specter',
+    trait: 'genius fool coward miser glutton liar saint_ rogue_ hermit nomad rival ally enemy stranger_ bully cheat snob optimist pessimist skeptic idealist introvert extrovert leader follower volunteer amateur expert novice veteran_ beginner'
+  });
+  // Animals: sex/age families
+  for (const [sp, ...rest] of [['sheep','ram','ewe'],['deer','buck','doe','fawn'],['duck','drake','','duckling'],['goose','gander','','gosling'],['swan','cob','pen','cygnet'],['fox','','vixen','kit_fox'],
+      ['kangaroo','','','joey'],['rabbit','','','bunny'],['goat','billy','nanny'],['cat','tom','queen'],['peacock','','peahen','peachick'],['frog','','','tadpole'],['insect','','','larva'],['fish','','','fry'],
+      ['hare','jackrabbit','','leveret'],['elephant','','','elephant_calf'],['dog','','bitch','pup'],['horse','','','colt'],['horse2','','','filly'],['bird','','','fledgling'],['owl','','','owlet'],['eagle','','','eaglet'],['seal','','','pup_seal'],['bear','','','bear_cub'],['butterfly','','','caterpillar']]) {
+    const t = sp.replace(/2$/, ''); FAMS.push([t, ...rest]);
+    rest.forEach((w, k) => { if (w) addNew(w.replace(/_.*$/, ''), 'animals', [['@animal', 1.4], ['sp_' + t, 1.2], k === 0 ? 'male' : k === 1 ? 'female' : 'young']); });
+  }
+  grp('animals', '@animal', {
+    sp_dogbreed: 'labrador poodle beagle bulldog boxer dachshund chihuahua husky rottweiler terrier collie spaniel greyhound corgi pug dalmatian doberman mastiff retriever pomeranian maltese schnauzer whippet bloodhound basset_hound saint_bernard great_dane shih_tzu akita samoyed malamute border_collie golden_retriever cocker_spaniel yorkie newfoundland pointer setter vizsla weimaraner papillon pekingese lhasa_apso bichon pit_bull',
+    sp_catbreed: 'siamese persian sphynx bengal ragdoll maine_coon burmese abyssinian birman tabby calico tortoiseshell manx himalayan savannah_cat ocicat',
+    sp_horsebreed: 'mustang arabian clydesdale appaloosa thoroughbred palomino pony lipizzaner percheron bronco mule shetland_pony',
+    sp_bigcat: 'jaguar puma cougar panther lynx bobcat ocelot caracal serval snow_leopard',
+    sp_savanna: 'hyena jackal coyote dingo meerkat mongoose warthog wildebeest gazelle impala bison yak llama alpaca ibex oryx springbok eland kudu aardwolf baboon',
+    sp_primate: 'lemur orangutan gibbon mandrill macaque marmoset tamarin bonobo capuchin langur gorilla_ spider_monkey',
+    sp_oddmammal: 'sloth armadillo anteater tapir okapi manatee platypus echidna wombat bat mole shrew weasel ferret badger skunk porcupine opossum wolverine polar_bear grizzly red_panda aardvark capybara chinchilla guinea_pig gerbil chipmunk marmot lemming vole muskrat groundhog stoat mink possum dormouse pangolin dugong tasmanian_devil sugar_glider',
+    sp_bird: 'robin finch bluejay cardinal canary pigeon dove seagull pelican albatross heron stork crane ibis falcon vulture condor kestrel osprey buzzard raven magpie jay starling swallow wren thrush nightingale lark woodpecker hummingbird kingfisher toucan macaw cockatoo parakeet budgie pheasant quail partridge ostrich emu kiwi cassowary puffin cormorant gull tern sandpiper plover loon grouse bunting oriole tanager warbler nuthatch chickadee mockingbird bluebird harrier kite roadrunner pelican_ bald_eagle golden_eagle barn_owl snowy_owl rooster_ vulture_ lovebird canary_ cuckoo dodo',
+    sp_sea: 'tuna cod haddock herring sardine anchovy mackerel bass carp catfish pike perch tilapia halibut flounder sole swordfish marlin barracuda eel angelfish clownfish piranha stingray seahorse jellyfish starfish urchin lobster shrimp prawn crayfish clam oyster mussel scallop squid cuttlefish nautilus narwhal orca walrus sea_lion barnacle sturgeon snapper grouper manta_ray hammerhead great_white pufferfish lionfish swordfish_ koi guppy betta sea_turtle sea_otter blue_whale humpback beluga porpoise',
+    sp_bug: 'ladybug grasshopper cricket cockroach termite firefly moth locust cicada mantis flea louse tick aphid hornet bumblebee fly gnat earwig weevil stag_beetle centipede millipede worm snail slug tarantula caterpillar_ maggot cricket_ praying_mantis honeybee fruit_fly stinkbug lacewing',
+    sp_reptile: 'iguana chameleon python anaconda viper rattlesnake komodo alligator gharial tortoise skink monitor_lizard salamander newt axolotl bullfrog tree_frog cobra_ boa mamba asp copperhead adder tuatara',
+    sp_farm: 'hen_ turkey_ ox oxen yak_ ewe_ heifer steer lamb_ mule_ ram_ piglet_ rooster_ pony_ bullock hog swine cattle livestock poultry'
+  }, 1.2);
+
+  // Countries and capitals
+  const more = L('afghanistan/kabul albania/tirana angola/luanda armenia/yerevan azerbaijan/baku bahamas/nassau bahrain/manama barbados/bridgetown belarus/minsk belize/belmopan benin/porto-novo bhutan/thimphu bosnia/sarajevo botswana/gaborone brunei/bandar_seri_begawan burkina_faso/ouagadougou burundi/gitega cambodia/phnom_penh cameroon/yaounde cape_verde/praia chad/ndjamena comoros/moroni costa_rica/san_jose cyprus/nicosia djibouti/djibouti_city dominica/roseau el_salvador/san_salvador eritrea/asmara eswatini/mbabane fiji/suva gabon/libreville gambia/banjul georgia/tbilisi guatemala/guatemala_city guinea/conakry guyana/georgetown haiti/port-au-prince honduras/tegucigalpa jamaica/kingston jordan/amman kuwait/kuwait_city kyrgyzstan/bishkek laos/vientiane lebanon/beirut lesotho/maseru liberia/monrovia libya/tripoli liechtenstein/vaduz luxembourg/luxembourg_city madagascar/antananarivo malawi/lilongwe mali/bamako malta/valletta mauritania/nouakchott mauritius/port_louis moldova/chisinau montenegro/podgorica mozambique/maputo myanmar/naypyidaw namibia/windhoek nicaragua/managua niger/niamey north_korea/pyongyang north_macedonia/skopje oman/muscat panama/panama_city papua_new_guinea/port_moresby paraguay/asuncion qatar/doha rwanda/kigali samoa/apia senegal/dakar sierra_leone/freetown slovakia/bratislava slovenia/ljubljana somalia/mogadishu sri_lanka/colombo sudan/khartoum suriname/paramaribo syria/damascus taiwan/taipei tajikistan/dushanbe tanzania/dodoma togo/lome tonga/nukualofa trinidad/port_of_spain turkmenistan/ashgabat uganda/kampala uae/abu_dhabi uzbekistan/tashkent vanuatu/port_vila yemen/sanaa zambia/lusaka zimbabwe/harare south_africa/pretoria south_sudan/juba dominican_republic/santo_domingo east_timor/dili equatorial_guinea/malabo central_african_republic/bangui ivory_coast/yamoussoukro kosovo/pristina solomon_islands/honiara kiribati/tarawa micronesia/palikir marshall_islands/majuro palau/ngerulmud tuvalu/funafuti nauru/yaren saint_lucia/castries grenada/st_georges antigua/st_johns san_marino/san_marino_city vatican/vatican_city monaco/monaco_ville andorra/andorra_la_vella singapore/singapore_city');
+  for (const pr of more) { const [c, cap] = pr.split('/'); if (seen.has(c) || seen.has(cap)) continue;
+    addNew(c, 'countries', [['@country', 1.4], ['k_' + c, 1.2]]); addNew(cap, 'capitals', [['@city', 1.4], ['k_' + c, 1.2], ['capital_of', 1.2]]); }
+  // Other cities, grouped by country
+  const cities = { k_france: 'lyon marseille nice toulouse bordeaux', k_germany: 'munich hamburg frankfurt cologne stuttgart', k_italy: 'milan naples venice florence turin', k_spain: 'barcelona seville valencia bilbao granada',
+    k_japan: 'osaka kyoto yokohama nagoya sapporo', k_china: 'shanghai shenzhen guangzhou chengdu hong_kong', k_india: 'mumbai kolkata chennai bangalore hyderabad', 'k_united states': 'new_york los_angeles chicago houston seattle boston miami denver atlanta',
+    'k_united kingdom': 'manchester liverpool birmingham glasgow edinburgh', k_brazil: 'rio_de_janeiro sao_paulo salvador recife', k_canada: 'toronto vancouver montreal calgary', k_australia: 'sydney melbourne perth brisbane adelaide',
+    k_russia: 'st_petersburg novosibirsk', k_turkey: 'istanbul izmir', k_egypt: 'alexandria luxor', k_mexico: 'guadalajara monterrey cancun', k_argentina: 'cordoba rosario', k_morocco: 'casablanca marrakech', k_nigeria: 'lagos kano', 'k_south africa': 'johannesburg cape_town durban' };
+  for (const k in cities) for (const w of L(cities[k])) addNew(w, 'capitals', [['@city', 1.4], [k, 1.0]]);
+
+  // Verbs: regular (past tense by rule) and irregular pairs
+  const past = v => { const dbl = v.endsWith('+'); v = v.replace('+', ''); return dbl ? v + v[v.length - 1] + 'ed' : v.endsWith('e') ? v + 'd' : /[^aeiou]y$/.test(v) ? v.slice(0, -1) + 'ied' : v + 'ed'; };
+  const verbPairs = L('accept add admire agree allow answer appear arrive ask attack bake bark bathe believe belong bless blink boil borrow bounce brush burn carry change chase cheer chew collect comb compare complain copy count cover crawl crush cure damage decide deliver destroy discover dive_ divide double dream dress drop+ dry earn enjoy enter escape explain fail fish fix follow fold fry gather glow guess hang_ happen hate hope hunt hurry imagine invite jog+ join judge kiss knock land lift like live look love marry measure melt mix move nod+ notice obey offer order pack park+ pass pick pour practice praise pray prepare print promise protect prove race rain reach realize record reduce relax remember repair repeat reply rescue rest return roll rub+ rush save scratch serve shout show shop+ skip+ slip+ smell snow solve sound spell stir+ stop+ stay stretch suggest surprise taste tease thank tie touch train trap+ trust try turn type use vote wait wander want warn wave wish wonder wrap+ yell zip+ blame bury camp chat+ chop+ clap+ cough crash dig_ drag+ drip+ drown dust earn_ fetch flash flip+ float flood freeze_ glue grab+ grin+ hug+ hum+ jam+ kneel_ knit+ lick limp lock mail mark mop+ nail paddle peel plug+ pop+ pump rob+ row scare shake_ shave sip+ sketch snap+ spill spot+ stare stuff sweat tap+ tip+ trim+ tug+ twist wipe worry');
+  for (const b of verbPairs.slice(0, 64)) { const p = past(b), base = b.replace('+', ''); if (seen.has(base) || seen.has(p)) continue;
+    addNew(base, 'verbs', [['@verb', 1.4], ['v_' + base, 1.2]]); addNew(p, 'verbs', [['@verb', 1.4], ['v_' + base, 1.2], ['past', 1.2]]); }
+  const irr = L('begin/began bite/bit blow/blew bring/brought choose/chose come/came deal/dealt dive/dove feed/fed feel/felt fight/fought find/found forget/forgot forgive/forgave freeze/froze get/got go/went hang/hung have/had hear/heard hold/held keep/kept lay/laid lead/led leave/left lend/lent light/lit make/made mean/meant meet/met say/said seek/sought shake/shook shine/shone shoot/shot shrink/shrank sink/sank slide/slid speed/sped spend/spent spin/spun spring/sprang steal/stole stick/stuck sting/stung strike/struck swear/swore sweep/swept swing/swung take/took tear/tore wake/woke weave/wove weep/wept wind/wound bend/bent bind/bound bleed/bled breed/bred creep/crept flee/fled fling/flung grind/ground leap/leapt ring/rang rise/rose slay/slew sling/slung undo/undid withdraw/withdrew become/became overcome/overcame understand/understood mistake/mistook forbid/forbade arise/arose awake/awoke lie/lay bear/bore dream/dreamt learn/learnt burn/burnt spoil/spoilt shear/shore swell/swelled thrive/throve');
+  for (const pr of irr) { const [b, p] = pr.split('/'); if (seen.has(b) || seen.has(p)) continue;
+    addNew(b, 'verbs', [['@verb', 1.4], ['v_' + b, 1.2]]); addNew(p, 'verbs', [['@verb', 1.4], ['v_' + b, 1.2], ['past', 1.2]]); }
+
+  // Colours: extra shades
+  const shades = {
+    warm: 'vermilion rust copper bronze salmon brick tangerine persimmon paprika cinnamon ginger honey marigold sunflower saffron mustard canary butter flame sunset ember cayenne terracotta sienna ochre russet auburn chestnut mahogany sepia umber cardinal carmine cerise garnet ruby blush rouge fuchsia magenta_ hot_pink bubblegum watermelon_pink flamingo_pink peach_ apricot_',
+    cool: 'cerulean cobalt sapphire ultramarine periwinkle cornflower sky_blue powder_blue steel_blue midnight_blue royal_blue baby_blue aquamarine seafoam jade forest_green hunter_green sage moss fern chartreuse pistachio kelly_green army_green khaki spruce pine shamrock celadon verdigris peacock denim ice_blue arctic glacier cyan_ orchid mauve amethyst heliotrope wisteria thistle plum_ eggplant grape_ aubergine',
+    light: 'cream ecru sand taupe pearl alabaster snow bone vanilla linen champagne eggshell parchment oatmeal cloud fog mist dove_gray platinum_ buff almond_color',
+    dark: 'slate graphite ash smoke pewter steel onyx ebony jet obsidian raven coal soot espresso_color mocha chocolate coffee_brown walnut wine claret oxblood bordeaux merlot blackcurrant_ midnight tar'
+  };
+  for (const k in shades) for (const w of L(shades[k])) addNew(w, 'colors', [['@color', 1.4], ['c_' + w, 1.0], [k, 0.8]]);
+
+  // Food & drink
+  grp('food', '@food', {
+    fruit: 'nectarine tangerine clementine mandarin lime guava lychee passionfruit dragonfruit persimmon cranberry gooseberry currant date raisin prune quince starfruit durian jackfruit tamarind boysenberry mulberry elderberry kumquat cantaloupe honeydew blood_orange green_apple olive_ cherry_tomato plantain yuzu rhubarb',
+    veg: 'zucchini eggplant cauliflower celery asparagus beet radish turnip parsnip leek shallot pumpkin squash cucumber_ pepper jalapeno chili artichoke kale arugula bok_choy brussels_sprouts green_bean pea edamame okra yam sweet_potato cassava ginger fennel kohlrabi watercress endive chard collard seaweed bean_sprout bell_pepper scallion chive',
+    legume: 'lentil chickpea soybean kidney_bean black_bean pinto_bean navy_bean lima_bean tofu tempeh hummus peanut',
+    grain: 'wheat oat barley rye quinoa millet couscous bulgur polenta cornmeal oatmeal granola cereal flour semolina buckwheat sorghum cornflakes porridge grits',
+    nut: 'almond walnut cashew pecan pistachio hazelnut macadamia chestnut_ pine_nut brazil_nut sunflower_seed sesame pumpkin_seed flaxseed chia',
+    meat: 'chicken beef pork lamb_chop veal turkey_meat duck_breast ham salami pepperoni prosciutto meatball meatloaf bratwurst hot_dog ribs brisket sirloin tenderloin drumstick jerky pastrami bologna chorizo liver gizzard venison bison_meat patty cutlet fillet roast gyro',
+    seafood: 'tuna_steak salmon_fillet shrimp_cocktail lobster_roll crab_cake calamari caviar sashimi tempura oyster_stew clam_chowder fish_fingers anchovy_paste fish_and_chips ceviche poke',
+    dairy: 'butter cream yogurt cheese ghee margarine buttermilk custard whipped_cream sour_cream ice_cream gelato sorbet kefir cottage_cheese cream_cheese condensed_milk',
+    cheese: 'cheddar mozzarella parmesan brie camembert gouda swiss feta ricotta gorgonzola provolone havarti halloumi mascarpone roquefort emmental gruyere manchego pecorino paneer stilton edam colby monterey_jack',
+    sweet: 'chocolate candy caramel fudge toffee marshmallow lollipop gummy licorice jelly jam marmalade honey syrup molasses nougat truffle praline marzipan brittle butterscotch popsicle sundae cheesecake tiramisu pudding mousse trifle tart eclair profiterole cannoli macaron baklava churro flan crepe meringue strudel gingerbread fruitcake shortbread sprinkles frosting icing candy_cane peppermint cotton_candy',
+    baked: 'baguette ciabatta focaccia sourdough pita naan tortilla roll bun crumpet danish pastry cracker breadstick cornbread flatbread rye_bread pumpernickel brioche challah chapati roti',
+    snack: 'chips popcorn crisps nachos_ trail_mix granola_bar pretzel_ rice_cake beef_jerky pork_rind cheese_puff peanut_butter nutella jam_toast energy_bar',
+    condiment: 'ketchup mustard mayonnaise vinegar soy_sauce salsa guacamole pesto relish wasabi hot_sauce barbecue_sauce gravy tahini sriracha teriyaki hoisin aioli ranch dressing pickle olive_oil sesame_oil fish_sauce miso',
+    spice: 'salt pepper_ cinnamon_ nutmeg clove cardamom cumin coriander turmeric paprika_ saffron_ vanilla oregano basil thyme rosemary sage_ parsley cilantro dill tarragon bay_leaf mint_ lavender_ cayenne_ curry_powder chili_powder allspice anise star_anise sumac',
+    cocktail: 'martini margarita mojito daiquiri cosmopolitan manhattan negroni bellini mimosa sangria pina_colada old_fashioned bloody_mary gin_and_tonic mai_tai whiskey_sour tequila rum gin brandy bourbon scotch sake liqueur absinthe',
+    drink2: 'cappuccino macchiato mocha_ americano chai matcha oolong kombucha cola root_beer ginger_ale tonic_water sparkling_water coconut_water orange_juice apple_juice iced_tea herbal_tea green_tea black_tea lager stout ale pilsner porter rose_wine merlot_ chardonnay cabernet prosecco',
+    italian: 'spaghetti fettuccine ravioli gnocchi penne macaroni carbonara bolognese marinara alfredo minestrone calzone bruschetta antipasto panini arancini',
+    mexican: 'enchilada quesadilla tamale fajita chimichanga tostada ceviche_ mole pozole elote churros_ empanada',
+    asian: 'dim_sum spring_roll fried_rice pad_thai chow_mein kimchi bibimbap tonkatsu udon soba onigiri teriyaki_ bao wonton laksa satay biryani tikka samosa dal korma vindaloo masala dosa pakora tandoori',
+    european: 'schnitzel goulash pierogi ratatouille quiche fondue raclette moussaka souvlaki tzatziki cassoulet bouillabaisse haggis shepherds_pie bangers_and_mash borscht blini',
+    american: 'meatloaf_ mac_and_cheese cornbread_ clam_bake chili_con_carne hush_puppies grilled_cheese apple_pie pot_roast jambalaya gumbo grits_ cobbler biscuits_and_gravy',
+    breakfast: 'bacon_ egg scrambled_eggs fried_egg boiled_egg poached_egg hash_browns french_toast muesli bagel_ yogurt_parfait',
+    meal2: 'breakfast lunch dinner brunch supper snack_ appetizer entree dessert feast banquet picnic barbecue buffet'
+  }, 1.0);
+
+  // Vehicles
+  grp('vehicles', '@vehicle', {
+    carbrand: 'toyota honda ford chevrolet nissan volkswagen bmw mercedes audi porsche ferrari lamborghini tesla volvo subaru mazda hyundai kia jaguar_car bentley rolls_royce maserati bugatti mini fiat peugeot renault citroen jeep_ dodge buick cadillac lexus mclaren aston_martin',
+    cartype: 'sedan coupe hatchback convertible suv crossover roadster sports_car race_car go_kart dune_buggy hot_rod muscle_car police_car stretch_limo hybrid_car electric_car stationwagon camper campervan motorhome rv hearse golf_cart',
+    bike: 'bmx tandem unicycle tricycle moped chopper mountain_bike road_bike dirt_bike scooter_ segway hoverboard sidecar quad_bike snowmobile jet_ski_ atv e_bike',
+    work: 'forklift crane excavator dump_truck cement_mixer garbage_truck tow_truck snowplow street_sweeper combine_harvester backhoe steamroller loader skid_steer tanker_truck flatbed delivery_van school_bus double_decker minibus coach trolleybus paddy_wagon food_truck ice_cream_truck',
+    rail2: 'steam_train express_train commuter_train cargo_train maglev light_rail funicular streetcar handcar boxcar caboose',
+    air2: 'airplane airliner jumbo_jet seaplane fighter_jet bomber stealth_bomber glider_ hot_air_balloon hang_glider paraglider zeppelin cessna concorde harrier gyrocopter chopper_ biplane_ jetpack space_shuttle',
+    space: 'capsule lander rover probe spacecraft starship orbiter shuttle space_station moon_buggy booster cargo_ship_',
+    boat2: 'dinghy catamaran trawler galleon schooner clipper steamship liner barge freighter tanker icebreaker lifeboat pontoon hovercraft paddleboat rowboat longship junk dhow corvette cruiser destroyer frigate battleship aircraft_carrier cruise_ship fishing_boat houseboat gondola_ outrigger skiff sloop ketch brig cutter steamer riverboat paddle_steamer surfboard jet_boat',
+    carriage: 'sled sleigh carriage chariot cart stagecoach buggy tuk_tuk wheelbarrow pedicab handcart oxcart hansom litter wagon_ rickshaw_ gig phaeton',
+    military: 'tank humvee armored_car howitzer missile_launcher troop_carrier torpedo_boat gunboat minesweeper'
+  }, 1.0);
+
+  // Known relations between word pairs (male to female, adult to young, country to capital, present to past).
+  // These are the "answer key" the Analogist trains and is tested against.
+  const R = { gender: [], young: [], capital: [], past: [] }, have = new Set(words.map(x => x.w));
+  const rp = (k, a, b) => { if (a !== b && have.has(a) && have.has(b)) R[k].push([a, b]); };
+  for (let i = 0; i + 1 < people.length; i++) {
+    const e = people[i], f = people[i + 1], rest = (x, g) => x.slice(1).filter(t => t !== g).join();
+    if (e.includes('male') && f.includes('female') && rest(e, 'male') === rest(f, 'female')) rp('gender', e[0], f[0]);
+  }
+  for (let i = 0; i < animals.length; i++) {
+    const [w, sp, ...t] = animals[i], nx = animals[i + 1];
+    if (t.includes('young')) { const par = animals.find(x => x[1] === sp); if (par[0] !== w) rp('young', par[0], w); }
+    if (nx && nx[1] === sp) { const t2 = nx.slice(2); if (t.includes('male') && t2.includes('female')) rp('gender', w, nx[0]); else if (t.includes('female') && t2.includes('male')) rp('gender', nx[0], w); }
+  }
+  NP.forEach(([m, f]) => rp('gender', m, f));
+  for (const [sp, m, f, y] of FAMS) { if (m && f) rp('gender', m, f); if (y) rp('young', sp, y.replace(/_.*$/, '')); }
+  pairs.forEach(([c, cap]) => rp('capital', c, cap));
+  more.forEach(pr => { const [c, cap] = pr.split('/'); rp('capital', c, cap); });
+  verbs.forEach(([p, q]) => rp('past', p, q));
+  verbPairs.slice(0, 64).forEach(b => rp('past', b.replace('+', ''), past(b)));
+  irr.forEach(pr => { const [b, p] = pr.split('/'); rp('past', b, p); });
+  words.rels = R;
+  return words;
+}
+
+function dot(a, b) { let s = 0; for (let i = 0; i < a.length; i++) s += a[i] * b[i]; return s; }
+function norm(a) { return Math.sqrt(dot(a, a)); }
+function cosine(a, b) { return dot(a, b) / (norm(a) * norm(b) || 1); }
+
+function nearest(words, vec, k, exclude) {
+  const ex = new Set(exclude || []);
+  const out = [];
+  for (let i = 0; i < words.length; i++) if (!ex.has(i)) out.push({ i, s: cosine(vec, words[i].v) });
+  out.sort((a, b) => b.s - a.s);
+  return out.slice(0, k);
+}
+
+function analogy(words, a, b, c, k) {
+  const t = new Float64Array(DIM);
+  for (let i = 0; i < DIM; i++) t[i] = words[b].v[i] - words[a].v[i] + words[c].v[i];
+  return nearest(words, t, k, [a, b, c]);
+}
+
+function pca(vecs, k, warm) {
+  const n = vecs.length, D = vecs[0].length;
+  const mean = new Float64Array(D);
+  for (let r = 0; r < n; r++) { const v = vecs[r]; for (let i = 0; i < D; i++) mean[i] += v[i] / n; }
+  const cov = Array.from({ length: D }, () => new Float64Array(D));
+  for (let r = 0; r < n; r++) { const x = vecs[r]; for (let i = 0; i < D; i++) { const xi = x[i], ci = cov[i]; for (let j = i; j < D; j++) ci[j] += xi * x[j]; } }
+  for (let i = 0; i < D; i++) for (let j = i; j < D; j++) { cov[i][j] = cov[i][j] / n - mean[i] * mean[j]; cov[j][i] = cov[i][j]; }
+  let trace = 0; for (let i = 0; i < D; i++) trace += cov[i][i];
+  const comps = [], vars = [];
+  for (let c = 0; c < k; c++) {
+    const hot = warm && warm[c];
+    let v = hot ? Float64Array.from(warm[c]) : Float64Array.from({ length: D }, (_, i) => Math.sin(i * 1.7 + c + 1));
+    let lam = 0;
+    for (let it = hot ? 12 : 300; it > 0; it--) {
+      const w = new Float64Array(D);
+      for (let i = 0; i < D; i++) w[i] = dot(cov[i], v);
+      lam = norm(w); for (let i = 0; i < D; i++) v[i] = w[i] / lam;
+    }
+    comps.push(v); vars.push(lam / trace);
+    for (let i = 0; i < D; i++) for (let j = 0; j < D; j++) cov[i][j] -= lam * v[i] * v[j];
+  }
+  const coords = vecs.map(x => { const o = []; for (const v of comps) { let t = 0; for (let i = 0; i < D; i++) t += (x[i] - mean[i]) * v[i]; o.push(t); } return o; });
+  return { coords, vars, comps };
+}
+
+// t-SNE, written as a generator so it can run in short slices without freezing the page.
+// Attraction uses each word's nearest neighbours only; repulsion is exact over all pairs.
+function* tsneSteps(vecs, opt) {
+  opt = opt || {};
+  const n = vecs.length, D = vecs[0].length, perp = opt.perplexity || 18, iters = opt.iters || 320, K = Math.min(n - 1, Math.round(perp * 3));
+  const nbr = new Int32Array(n * K), pc = new Float64Array(n * K), row = new Float64Array(n), srt = new Float64Array(n);
+  let msum = 0, mcnt = 0;
+  for (let i = 0; i < Math.min(n, 60); i++) for (let j = 0; j < n; j += 7) if (j !== i) { let s = 0; for (let k = 0; k < D; k++) { const d = vecs[i][k] - vecs[j][k]; s += d * d; } msum += s; mcnt++; }
+  const mean = msum / mcnt, target = Math.log(perp);
+  for (let i = 0; i < n; i++) {
+    const vi = vecs[i];
+    for (let j = 0; j < n; j++) { let s = 0; const vj = vecs[j]; for (let k = 0; k < D; k++) { const d = vi[k] - vj[k]; s += d * d; } row[j] = j === i ? Infinity : s / mean; srt[j] = row[j]; }
+    srt.sort(); const cut = srt[K - 1]; let m = 0;
+    for (let j = 0; j < n && m < K; j++) if (row[j] <= cut) { nbr[i * K + m] = j; pc[i * K + m] = row[j]; m++; }
+    let lo = 0, hi = Infinity, beta = 1;
+    for (let it = 0; it < 50; it++) {
+      let sp = 0, sd = 0;
+      for (let q = 0; q < K; q++) { const p = Math.exp(-pc[i * K + q] * beta); sp += p; sd += pc[i * K + q] * p; }
+      const H = Math.log(sp) + beta * sd / sp;
+      if (Math.abs(H - target) < 1e-5) break;
+      if (H > target) { lo = beta; beta = hi === Infinity ? beta * 2 : (beta + hi) / 2; } else { hi = beta; beta = (beta + lo) / 2; }
+    }
+    let sp = 0; for (let q = 0; q < K; q++) { const p = Math.exp(-pc[i * K + q] * beta); pc[i * K + q] = p; sp += p; }
+    for (let q = 0; q < K; q++) pc[i * K + q] /= sp;
+    if (i % 100 === 99) yield i / n * 0.15;
+  }
+  const edges = new Map();
+  for (let i = 0; i < n; i++) for (let q = 0; q < K; q++) { const j = nbr[i * K + q], key = i < j ? i * n + j : j * n + i; edges.set(key, (edges.get(key) || 0) + pc[i * K + q] / (2 * n)); }
+  const E = edges.size, ei = new Int32Array(E), ej = new Int32Array(E), ep = new Float64Array(E); let e0 = 0;
+  for (const [key, p] of edges) { ei[e0] = Math.floor(key / n); ej[e0] = key % n; ep[e0] = Math.max(p, 1e-12); e0++; }
+  yield 0.15;
+
+  const init = pca(vecs, 2).coords;
+  let sd = 0; for (const c of init) sd += c[0] * c[0] + c[1] * c[1]; sd = Math.sqrt(sd / (2 * n));
+  const Y = new Float64Array(n * 2), U = new Float64Array(n * 2), G = new Float64Array(n * 2).fill(1);
+  for (let i = 0; i < n; i++) { Y[2 * i] = init[i][0] / sd * 0.01; Y[2 * i + 1] = init[i][1] / sd * 0.01; }
+  const grad = new Float64Array(n * 2), rep = new Float64Array(n * 2), lr = 100 * Math.max(1, n / 600);
+  // Repulsion: points are binned on a coarse grid. Nearby cells are summed exactly, distant cells by their centre of mass.
+  const GN = Math.max(8, Math.round(Math.sqrt(n / 10))), NC = GN * GN, qx = new Float64Array(n), qy = new Float64Array(n);
+  const cnt = new Int32Array(NC), start = new Int32Array(NC + 1), fill = new Int32Array(NC), cell = new Int32Array(n), ord = new Int32Array(n), cx = new Float64Array(NC), cy = new Float64Array(NC), live = new Int32Array(NC), LX = new Float64Array(NC), LY = new Float64Array(NC), LM = new Float64Array(NC), LGX = new Int32Array(NC), LGY = new Int32Array(NC);
+  for (let it = 0; it < iters; it++) {
+    const exag = it < 100 ? 12 : 1, mom = it < 100 ? 0.5 : 0.8;
+    // Grid bounds ignore the outermost 2% of points so a few outliers cannot cram everyone else into a handful of cells.
+    for (let i = 0; i < n; i++) { qx[i] = Y[2 * i]; qy[i] = Y[2 * i + 1]; }
+    qx.sort(); qy.sort();
+    const lo = Math.floor(n * 0.02), hi = n - 1 - lo, x0 = qx[lo], y0 = qy[lo];
+    const sw = (Math.max(qx[hi] - x0, qy[hi] - y0) + 1e-9) / GN;
+    cnt.fill(0); cx.fill(0); cy.fill(0);
+    for (let i = 0; i < n; i++) { const gx = Math.min(GN - 1, Math.max(0, Math.floor((Y[2 * i] - x0) / sw))), gy = Math.min(GN - 1, Math.max(0, Math.floor((Y[2 * i + 1] - y0) / sw))), c = gy * GN + gx; cell[i] = c; cnt[c]++; cx[c] += Y[2 * i]; cy[c] += Y[2 * i + 1]; }
+    let nl = 0; start[0] = 0;
+    for (let c = 0; c < NC; c++) { start[c + 1] = start[c] + cnt[c]; fill[c] = start[c]; if (cnt[c]) { cx[c] /= cnt[c]; cy[c] /= cnt[c]; LX[nl] = cx[c]; LY[nl] = cy[c]; LM[nl] = cnt[c]; LGX[nl] = c % GN; LGY[nl] = (c / GN) | 0; nl++; } }
+    for (let i = 0; i < n; i++) ord[fill[cell[i]]++] = i;
+    let sumQ = 0; rep.fill(0); grad.fill(0);
+    for (let i = 0; i < n; i++) {
+      const xi = Y[2 * i], yi = Y[2 * i + 1], ci = cell[i], gx = ci % GN, gy = (ci - gx) / GN; let rx = 0, ry = 0, sq = 0;
+      for (let l = 0; l < nl; l++) {
+        const ax = LGX[l] - gx, ay = LGY[l] - gy;
+        if (ax >= -1 && ax <= 1 && ay >= -1 && ay <= 1) continue;
+        const dx = xi - LX[l], dy = yi - LY[l], q = 1 / (1 + dx * dx + dy * dy), mq = LM[l] * q;
+        sq += mq; rx += mq * q * dx; ry += mq * q * dy;
+      }
+      for (let hy = Math.max(0, gy - 1); hy <= Math.min(GN - 1, gy + 1); hy++) for (let hx = Math.max(0, gx - 1); hx <= Math.min(GN - 1, gx + 1); hx++) {
+        const c = hy * GN + hx;
+        for (let p = start[c]; p < start[c + 1]; p++) {
+          const j = ord[p]; if (j === i) continue;
+          const dx = xi - Y[2 * j], dy = yi - Y[2 * j + 1], q = 1 / (1 + dx * dx + dy * dy);
+          sq += q; rx += q * q * dx; ry += q * q * dy;
+        }
+      }
+      sumQ += sq; rep[2 * i] = rx; rep[2 * i + 1] = ry;
+    }
+    for (let e = 0; e < E; e++) {
+      const i = ei[e], j = ej[e], dx = Y[2 * i] - Y[2 * j], dy = Y[2 * i + 1] - Y[2 * j + 1], q = 1 / (1 + dx * dx + dy * dy), m = exag * ep[e] * q;
+      grad[2 * i] += m * dx; grad[2 * i + 1] += m * dy; grad[2 * j] -= m * dx; grad[2 * j + 1] -= m * dy;
+    }
+    let mx = 0, my = 0;
+    for (let k = 0; k < 2 * n; k++) {
+      const g = 4 * (grad[k] - rep[k] / sumQ);
+      G[k] = (Math.sign(g) !== Math.sign(U[k])) ? G[k] + 0.2 : Math.max(G[k] * 0.8, 0.01);
+      U[k] = mom * U[k] - lr * G[k] * g;
+      Y[k] += U[k];
+      if (k % 2 === 0) mx += Y[k] / n; else my += Y[k] / n;
+    }
+    for (let i = 0; i < n; i++) { Y[2 * i] -= mx; Y[2 * i + 1] -= my; }
+    yield 0.15 + 0.85 * (it + 1) / iters;
+  }
+  return Array.from({ length: n }, (_, i) => [Y[2 * i], Y[2 * i + 1]]);
+}
+
+function axesProject(words, a1, b1, a2, b2) {
+  const d = (a, b) => Float64Array.from(words[b].v, (x, i) => x - words[a].v[i]);
+  let ux = d(a1, b1); const nx = norm(ux); ux = ux.map(x => x / (nx || 1));
+  let uy = d(a2, b2); const p = dot(uy, ux); uy = uy.map((x, i) => x - p * ux[i]);
+  const ny = norm(uy); uy = uy.map(x => x / (ny || 1));
+  const mean = new Float64Array(DIM);
+  for (const w of words) for (let i = 0; i < DIM; i++) mean[i] += w.v[i] / words.length;
+  return words.map(w => { const c = Float64Array.from(w.v, (x, i) => x - mean[i]); return [dot(c, ux), dot(c, uy)]; });
+}
+
+(function () {
+  const words = buildWords();
+  const N = words.length;
+  // Untrained model: every word's vector is random noise. The original structured vectors become the hidden
+  // co-occurrence statistics (t) the AI learns from; it never copies them directly.
+  const buf = new Float64Array(N * DIM);
+  let seedN = 1;
+  function randomize() {
+    const r = mulberry32(1000 + seedN++);
+    for (let i = 0; i < N; i++) {
+      const o = i * DIM; let s = 0;
+      for (let k = 0; k < DIM; k++) { let u = 0; while (!u) u = r(); const g = Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * r()); buf[o + k] = g; s += g * g; }
+      s = Math.sqrt(s) / 0.8; for (let k = 0; k < DIM; k++) buf[o + k] /= s;
+    }
+  }
+  words.forEach((w, i) => { w.t = w.v; w.v = buf.subarray(i * DIM, (i + 1) * DIM); });
+  randomize();
+  document.getElementById('wordcount-text').textContent = `${N.toLocaleString()} words, each stored as a list of 48 numbers. Flatten them to a plane and words that behave alike land together. Pick a word to see its neighbours, or solve an analogy by vector arithmetic or with the Analogist.`;
+
+  const idx = w => words.findIndex(x => x.w === w);
+  const SHAPES = [
+    null,
+    [[-1,-1],[1,-1],[1,1],[-1,1]],
+    [[0,-1.2],[1.05,.85],[-1.05,.85]],
+    [[0,-1.3],[1.3,0],[0,1.3],[-1.3,0]],
+    [[0,1.2],[1.05,-.85],[-1.05,-.85]],
+    [[1.15,0],[.58,1],[-.58,1],[-1.15,0],[-.58,-1],[.58,-1]],
+    [[-.35,-1.1],[.35,-1.1],[.35,-.35],[1.1,-.35],[1.1,.35],[.35,.35],[.35,1.1],[-.35,1.1],[-.35,.35],[-1.1,.35],[-1.1,-.35],[-.35,-.35]],
+    [[0,-1.2],[1.14,-.37],[.7,.97],[-.7,.97],[-1.14,-.37]]
+  ];
+  const $ = id => document.getElementById(id);
+  const esc = s => s.replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+
+  function shapeSVG(ci, size) {
+    const pts = SHAPES[ci];
+    const body = pts ? `<polygon points="${pts.map(p => (p[0] * 5).toFixed(2) + ',' + (p[1] * 5).toFixed(2)).join(' ')}" fill="var(--c${ci})"/>`
+                     : `<circle r="5" fill="var(--c${ci})"/>`;
+    return `<svg class="shape" viewBox="-6 -6 12 12" style="width:${size || 12}px;height:${size || 12}px" aria-hidden="true">${body}</svg>`;
+  }
+
+  // Layouts
+  let pcaRes = pca(words.map(w => w.v), 3);
+  const layouts = { pca: pcaRes.coords.map(c => [c[0], c[1]]), tsne: null, axes: null };
+  const AX = { x1: idx('man'), x2: idx('woman'), y1: idx('man'), y2: idx('king') };
+  
+  function normalize(c) {
+    let mx = 1e-9, my = 1e-9;
+    for (const p of c) { mx = Math.max(mx, Math.abs(p[0])); my = Math.max(my, Math.abs(p[1])); }
+    return c.map(p => [p[0] / mx, p[1] / my]);
+  }
+  function recomputeAxes() { layouts.axes = normalize(axesProject(words, AX.x1, AX.x2, AX.y1, AX.y2)); }
+  layouts.pca = normalize(layouts.pca); recomputeAxes();
+
+  // State
+  const S = {
+    mode: 'pca', sel: idx('king'), hover: -1, hidden: new Set(), nbHover: -1,
+    view: { k: 1, x: 0, y: 0 },
+    cur: layouts.pca.map(p => p.slice()), from: null, to: null, t0: 0
+  };
+  const A = { a: idx('man'), b: idx('king'), c: idx('woman'), res: [], ai: -1 };
+
+  const canvas = $('plot'), ctx = canvas.getContext('2d');
+  let W = 0, H = 0, dpr = 1, T = {}, raf = 0;
+  const sx = new Float64Array(N), sy = new Float64Array(N);
+
+  function readTheme() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = n => cs.getPropertyValue(n).trim();
+    T = { bg: g('--plate'), ink: g('--ink'), muted: g('--muted'), grid: g('--grid'), line: g('--line'),
+          cats: CATS.map((_, i) => g('--c' + i)), neg: g('--neg'), pos: g('--pos') };
+  }
+  function schedule() { if (!raf) raf = requestAnimationFrame(draw); }
+
+  function resize() {
+    const r = $('cw').getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1; W = r.width; H = r.height;
+    canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr);
+    schedule();
+  }
+
+  function base(i) {
+    const pad = 44, p = S.cur[i];
+    return [pad + (p[0] + 1) / 2 * (W - 2 * pad), pad + (1 - (p[1] + 1) / 2) * (H - 2 * pad)];
+  }
+  function base2(px, py) { const pad = 44; return [pad + (px + 1) / 2 * (W - 2 * pad), pad + (1 - (py + 1) / 2) * (H - 2 * pad)]; }
+  function toScreen(bx, by) { const v = S.view; return [(bx - W / 2) * v.k + W / 2 + v.x, (by - H / 2) * v.k + H / 2 + v.y]; }
+
+  function poly(c, ci, x, y, r) {
+    const pts = SHAPES[ci]; c.beginPath();
+    if (!pts) { c.arc(x, y, r, 0, Math.PI * 2); return; }
+    pts.forEach((p, k) => { const px = x + p[0] * r, py = y + p[1] * r; k ? c.lineTo(px, py) : c.moveTo(px, py); });
+    c.closePath();
+  }
+
+  function arrow(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1, L = Math.hypot(dx, dy); if (L < 18) return;
+    const ux = dx / L, uy = dy / L, a = x1 + ux * 9, b = y1 + uy * 9, c = x2 - ux * 10, d = y2 - uy * 10;
+    ctx.save(); ctx.strokeStyle = T.ink; ctx.fillStyle = T.ink; ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath(); ctx.moveTo(a, b); ctx.lineTo(c, d); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(c + ux * 1, d + uy * 1);
+    ctx.lineTo(c - ux * 8 - uy * 4.5, d - uy * 8 + ux * 4.5); ctx.lineTo(c - ux * 8 + uy * 4.5, d - uy * 8 - ux * 4.5);
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+
+  function draw() {
+    raf = 0;
+    if (S.to) {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      let t = reduce ? 1 : Math.min(1, (performance.now() - S.t0) / 520);
+      const e = t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+      for (let i = 0; i < N; i++) { S.cur[i][0] = S.from[i][0] + (S.to[i][0] - S.from[i][0]) * e; S.cur[i][1] = S.from[i][1] + (S.to[i][1] - S.from[i][1]) * e; }
+      if (t >= 1) S.to = null; else schedule();
+    }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, W, H);
+
+    ctx.strokeStyle = T.grid; ctx.lineWidth = 1; ctx.beginPath();
+    for (let x = 0.5; x < W; x += 40) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    for (let y = 0.5; y < H; y += 40) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    ctx.stroke();
+
+    if (S.mode !== 'tsne') {
+      const o = toScreen(...base2(0, 0));
+      ctx.strokeStyle = T.line; ctx.lineWidth = 1; ctx.beginPath();
+      ctx.moveTo(o[0] + .5, 0); ctx.lineTo(o[0] + .5, H); ctx.moveTo(0, o[1] + .5); ctx.lineTo(W, o[1] + .5); ctx.stroke();
+    }
+    for (let i = 0; i < N; i++) { const b = base(i), s = toScreen(b[0], b[1]); sx[i] = s[0]; sy[i] = s[1]; }
+
+    const focus = new Set();
+    let nb = [];
+    if (S.sel >= 0) { focus.add(S.sel); nb = nearest(words, words[S.sel].v, 8, [S.sel]); nb.forEach(n => focus.add(n.i)); }
+    const an = [A.a, A.b, A.c, A.res[0] ? A.res[0].i : -1, A.ai >= 0 ? A.ai : -1].filter(i => i >= 0);
+    an.forEach(i => focus.add(i));
+
+    if (A.res[0] && A.a >= 0 && A.b >= 0 && A.c >= 0) {
+      arrow(sx[A.a], sy[A.a], sx[A.b], sy[A.b]);
+      arrow(sx[A.c], sy[A.c], sx[A.res[0].i], sy[A.res[0].i]);
+    }
+
+    // Lines from the selected word to its three most similar words (strongest = thickest)
+    if (S.sel >= 0) {
+      ctx.save(); ctx.strokeStyle = T.ink; ctx.lineCap = 'round';
+      nb.slice(0, 3).forEach((n, k) => {
+        if (S.hidden.has(words[n.i].ci) || S.hidden.has(words[S.sel].ci)) return;
+        ctx.globalAlpha = 0.85 - k * 0.2; ctx.lineWidth = 2.6 - k * 0.7;
+        ctx.beginPath(); ctx.moveTo(sx[S.sel], sy[S.sel]); ctx.lineTo(sx[n.i], sy[n.i]); ctx.stroke();
+      });
+      ctx.restore();
+    }
+
+    const dim = focus.size > 0;
+    for (let i = 0; i < N; i++) {
+      if (S.hidden.has(words[i].ci)) continue;
+      const f = focus.has(i), r = i === S.sel ? 8 : f ? 6.5 : 3.4;
+      ctx.globalAlpha = dim && !f ? 0.38 : 1;
+      poly(ctx, words[i].ci, sx[i], sy[i], r);
+      ctx.fillStyle = T.cats[words[i].ci]; ctx.fill();
+      ctx.lineWidth = f ? 1 : 0.6; ctx.strokeStyle = T.bg; ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    for (const n of nb) if (!S.hidden.has(words[n.i].ci)) { poly(ctx, words[n.i].ci, sx[n.i], sy[n.i], 10); ctx.strokeStyle = T.ink; ctx.lineWidth = 1; ctx.stroke(); }
+    if (S.sel >= 0) { ctx.beginPath(); ctx.arc(sx[S.sel], sy[S.sel], 13, 0, Math.PI * 2); ctx.strokeStyle = T.ink; ctx.lineWidth = 2; ctx.stroke(); }
+    if (S.hover >= 0) { ctx.beginPath(); ctx.arc(sx[S.hover], sy[S.hover], 10, 0, Math.PI * 2); ctx.strokeStyle = T.ink; ctx.lineWidth = 1.5; ctx.stroke(); }
+
+    const order = [], inOrder = new Set();
+    const push = i => { if (i >= 0 && !inOrder.has(i) && !S.hidden.has(words[i].ci)) { inOrder.add(i); order.push(i); } };
+    push(S.sel); an.forEach(push); nb.forEach(n => push(n.i)); push(S.hover);
+    for (let i = 0; i < N; i++) push(i);
+
+    const placed = [];
+    ctx.font = '12px "IBM Plex Sans", system-ui, sans-serif'; ctx.textBaseline = 'middle'; ctx.lineJoin = 'round';
+    for (const i of order) {
+      const important = focus.has(i) || i === S.hover;
+      const txt = words[i].w, tw = ctx.measureText(txt).width;
+      let lx = sx[i] + 10, ly = sy[i];
+      if (lx + tw > W - 4) lx = sx[i] - 10 - tw;
+      const rect = [lx - 2, ly - 8, lx + tw + 2, ly + 8];
+      if (rect[0] < 0 || rect[2] > W || rect[1] < 0 || rect[3] > H) continue;
+      if (!important && placed.some(p => !(rect[2] < p[0] || rect[0] > p[2] || rect[3] < p[1] || rect[1] > p[3]))) continue;
+      placed.push(rect);
+      ctx.globalAlpha = dim && !important ? 0.55 : 1;
+      ctx.lineWidth = 3; ctx.strokeStyle = T.bg; ctx.strokeText(txt, lx, ly);
+      ctx.fillStyle = T.ink; ctx.font = (important ? '600 ' : '400 ') + '12px "IBM Plex Sans", system-ui, sans-serif';
+      ctx.fillText(txt, lx, ly);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  function strip(c, v, ref) {
+    if (!c) return;
+    const r = c.getBoundingClientRect(), d = window.devicePixelRatio || 1, w = Math.max(1, r.width), h = 22;
+    c.width = Math.round(w * d); c.height = Math.round(h * d);
+    const x = c.getContext('2d'); x.setTransform(d, 0, 0, d, 0, 0); x.clearRect(0, 0, w, h);
+    let m = 0; for (const t of ref) m = Math.max(m, Math.abs(t)); m = m || 1;
+    const cw = w / DIM;
+    for (let i = 0; i < DIM; i++) {
+      x.globalAlpha = Math.min(1, Math.abs(v[i]) / m * 1.1 + 0.06);
+      x.fillStyle = v[i] >= 0 ? T.pos : T.neg;
+      x.fillRect(i * cw + 0.5, 0, cw - 1, h);
+    }
+    x.globalAlpha = 1;
+  }
+
+  function nbRows(list) {
+    return list.map(n => `<button type="button" data-i="${n.i}">${shapeSVG(words[n.i].ci, 11)}<span>${esc(words[n.i].w)}</span>
+      <span class="bar-track"><span class="bar-fill" style="display:block;width:${Math.max(2, Math.min(1, Math.max(0, n.s)) * 100).toFixed(0)}%"></span></span>
+      <span class="val">${n.s.toFixed(2)}</span></button>`).join('');
+  }
+
+  function renderWord() {
+    const el = $('wordcard');
+    if (S.sel < 0) { el.innerHTML = '<p class="eyebrow">Word</p><p class="fine">Select a point on the chart to inspect its vector and neighbours.</p>'; return; }
+    const w = words[S.sel], nb = nearest(words, w.v, 8, [S.sel]);
+    const cmp = S.nbHover >= 0 ? S.nbHover : nb[0].i;
+    el.innerHTML = `<p class="eyebrow">Selected word</p>
+      <div class="wordhead"><h2>${esc(w.w)}</h2><span class="cat">${shapeSVG(w.ci, 12)}${CATS[w.ci].name}</span></div>
+      <p class="eyebrow">Nearest by cosine similarity</p>
+      <div class="nb" id="nblist">${nbRows(nb)}</div>
+      <p class="eyebrow">Vector, 48 dimensions</p>
+      <div class="strips">
+        <div class="strip-row"><span>${esc(w.w)}</span><canvas id="s1"></canvas></div>
+        <div class="strip-row"><span id="s2name">${esc(words[cmp].w)}</span><canvas id="s2"></canvas></div>
+      </div>
+      <p class="fine">Each cell is one dimension: <span style="color:var(--pos)">orange</span> positive, <span style="color:var(--neg)">blue</span> negative. Similar words share a pattern.</p>`;
+    const ref = [...w.v, ...words[cmp].v];
+    strip($('s1'), w.v, ref); strip($('s2'), words[cmp].v, ref);
+    
+    const list = $('nblist');
+    list.querySelectorAll('button').forEach(b => {
+      const i = +b.dataset.i;
+      b.addEventListener('click', () => select(i));
+      b.addEventListener('mouseenter', () => { $('s2name').textContent = words[i].w; const rr = [...w.v, ...words[i].v]; strip($('s1'), w.v, rr); strip($('s2'), words[i].v, rr); S.hover = i; schedule(); });
+      b.addEventListener('mouseleave', () => { S.hover = -1; schedule(); });
+    });
+  }
+
+  function fillSelect(sel, value) {
+    if (sel.options.length && sel.value === String(value)) return;
+    let html = '';
+    CATS.forEach((c, ci) => {
+      const opts = words.map((w, i) => ({ w: w.w, i, ci: w.ci })).filter(o => o.ci === ci).sort((a, b) => a.w.localeCompare(b.w));
+      html += `<optgroup label="${c.name}">${opts.map(o => `<option value="${o.i}">${esc(o.w)}</option>`).join('')}</optgroup>`;
+    });
+    sel.innerHTML = html; sel.value = String(value);
+  }
+
+  function renderAnalogy() {
+    [['aa', A.a], ['ab', A.b], ['ac', A.c]].forEach(([id, i]) => { const el = $(id); if (document.activeElement !== el && i >= 0) el.value = words[i].w; });
+    if (A.a >= 0 && A.b >= 0 && A.c >= 0) {
+      A.res = analogy(words, A.a, A.b, A.c, 6);
+      $('aans').textContent = A.res[0] ? words[A.res[0].i].w : '?';
+      A.ai = analogistAnswer(A.a, A.b, A.c);
+      const rows = [['Vector arithmetic', A.res[0] ? A.res[0].i : -1], ['Analogist AI', A.ai]].filter(r => r[1] >= 0);
+      $('aiverdict').innerHTML = rows.map(([who, i]) => { const p = judgeP(A.a, A.b, A.c, i);
+        return `<button type="button" data-i="${i}">${shapeSVG(words[i].ci, 11)}<span>${who}: <b>${esc(words[i].w)}</b></span>
+        <span class="bar-track"><span class="bar-fill" style="display:block;width:${Math.max(2, p * 100).toFixed(0)}%"></span></span><span class="val">${(p * 100).toFixed(0)}%</span></button>`; }).join('');
+      $('aiverdict').querySelectorAll('button').forEach(b => {
+        const i = +b.dataset.i;
+        b.addEventListener('click', () => select(i));
+        b.addEventListener('mouseenter', () => { S.hover = i; schedule(); });
+        b.addEventListener('mouseleave', () => { S.hover = -1; schedule(); });
+      });
+      $('alist').innerHTML = nbRows(A.res);
+      $('alist').querySelectorAll('button').forEach(b => {
+        const i = +b.dataset.i;
+        b.addEventListener('click', () => select(i));
+        b.addEventListener('mouseenter', () => { S.hover = i; schedule(); });
+        b.addEventListener('mouseleave', () => { S.hover = -1; schedule(); });
+      });
+    }
+  }
+
+  function select(i) { S.sel = i; renderWord(); schedule(); }
+
+  // Run t-SNE in ~30 ms slices so the page stays responsive; the points glide over when it finishes.
+  let tsneJob = 0;
+  function computeTsne(done) {
+    const job = ++tsneJob, gen = tsneSteps(words.map(w => w.v));
+    (function step() {
+      if (job !== tsneJob) return;
+      const t0 = performance.now(); let r;
+      do { r = gen.next(); } while (!r.done && performance.now() - t0 < 30);
+      if (r.done) { layouts.tsne = normalize(r.value); done(); return; }
+      if (S.mode === 'tsne') $('caption').textContent = `t-SNE: laying out ${N.toLocaleString()} words\u2026 ${Math.round(r.value * 100)}%`;
+      setTimeout(step, 0);
+    })();
+  }
+
+  function switchMode(m) {
+    if (m === 'axes') recomputeAxes();
+    S.mode = m;
+    document.querySelectorAll('.seg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.mode === m));
+    $('axesui').hidden = m !== 'axes';
+    if (m === 'tsne' && !layouts.tsne) { computeTsne(() => { if (S.mode === 'tsne') switchMode('tsne'); }); return; }
+    S.from = S.cur.map(p => p.slice());
+    S.to = layouts[m].map(p => p.slice());
+    S.t0 = performance.now();
+    
+    if (m === 'pca') $('caption').textContent = `PCA: Dimensions 1 & 2 explain ${(pcaRes.vars[0]*100).toFixed(1)}% and ${(pcaRes.vars[1]*100).toFixed(1)}% variance. Linear projection preserves absolute distances well.`;
+    else if (m === 'tsne') $('caption').textContent = 't-SNE: Non-linear layout that clusters tight semantic neighbourhoods together. Computed from the vectors as they are right now.';
+    else $('caption').textContent = `Custom projection along semantic vectors: X = ${words[AX.x1].w} → ${words[AX.x2].w}, Y = ${words[AX.y1].w} → ${words[AX.y2].w}.`;
+    
+    schedule();
+  }
+
+  // Event handlers
+  window.addEventListener('resize', resize);
+
+  $('search').addEventListener('input', e => {
+    const i = idx(e.target.value.trim().toLowerCase());
+    if (i >= 0) select(i);
+  });
+
+  document.querySelectorAll('.seg button').forEach(b => b.addEventListener('click', () => switchMode(b.dataset.mode)));
+
+  const setAx = (k, v) => { AX[k] = +v; recomputeAxes(); if (S.mode === 'axes') switchMode('axes'); };
+  ['x1','x2','y1','y2'].forEach(k => { fillSelect($(k), AX[k]); $(k).addEventListener('change', e => setAx(k, e.target.value)); });
+
+  const axPresets = [
+    { label: 'Gender vs Royalty', x1: 'man', x2: 'woman', y1: 'man', y2: 'king' },
+    { label: 'Tense vs Country', x1: 'walk', x2: 'walked', y1: 'france', y2: 'paris' },
+    { label: 'Age vs Gender', x1: 'boy', x2: 'man', y1: 'woman', y2: 'man' }
+  ];
+  $('axpresets').innerHTML = axPresets.map((p, i) => `<button type="button" class="chip" data-i="${i}">${p.label}</button>`).join('');
+  $('axpresets').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const p = axPresets[+b.dataset.i];
+    AX.x1 = idx(p.x1); AX.x2 = idx(p.x2); AX.y1 = idx(p.y1); AX.y2 = idx(p.y2);
+    ['x1','x2','y1','y2'].forEach(k => $(k).value = String(AX[k]));
+    recomputeAxes(); switchMode('axes');
+  });
+
+  const aPresets = [
+    { a: 'man', b: 'king', c: 'woman' },
+    { a: 'walk', b: 'walked', c: 'run' },
+    { a: 'france', b: 'paris', c: 'japan' },
+    { a: 'dog', b: 'puppy', c: 'cat' }
+  ];
+  $('apresets').innerHTML = aPresets.map((p, i) => `<button type="button" class="chip" data-i="${i}">${p.a}:${p.b} :: ${p.c}:?</button>`).join('');
+  $('apresets').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const p = aPresets[+b.dataset.i];
+    A.a = idx(p.a); A.b = idx(p.b); A.c = idx(p.c);
+    renderAnalogy(); schedule();
+  });
+
+  // The three analogy slots are typable: pick from the suggestions or type any word. Valid words apply as you type.
+  ['aa','ab','ac'].forEach((id, k) => {
+    const el = $(id), key = ['a', 'b', 'c'][k];
+    el.addEventListener('input', () => { const i = idx(el.value.trim().toLowerCase()); if (i >= 0) { A[key] = i; renderAnalogy(); schedule(); } });
+    el.addEventListener('focus', () => el.select());
+    el.addEventListener('blur', () => { if (A[key] >= 0) el.value = words[A[key]].w; });
+    el.addEventListener('keydown', e => { if (e.key === 'Enter') el.blur(); });
+  });
+
+  // Zooming & Panning
+  $('zin').addEventListener('click', () => { S.view.k *= 1.3; schedule(); });
+  $('zout').addEventListener('click', () => { S.view.k /= 1.3; schedule(); });
+  $('zreset').addEventListener('click', () => { S.view = { k: 1, x: 0, y: 0 }; schedule(); });
+
+  let dragging = false, lx = 0, ly = 0;
+  canvas.addEventListener('pointerdown', e => { dragging = true; lx = e.clientX; ly = e.clientY; canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointermove', e => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    if (dragging) {
+      S.view.x += e.clientX - lx; S.view.y += e.clientY - ly;
+      lx = e.clientX; ly = e.clientY; schedule();
+      return;
+    }
+    let hit = -1, best = 16;
+    for (let i = 0; i < N; i++) {
+      if (S.hidden.has(words[i].ci)) continue;
+      const d = Math.hypot(sx[i] - mx, sy[i] - my);
+      if (d < best) { best = d; hit = i; }
+    }
+    if (hit !== S.hover) {
+      S.hover = hit;
+      canvas.classList.toggle('hit', hit >= 0);
+      const tip = $('tip');
+      if (hit >= 0) {
+        tip.style.display = 'block'; tip.style.left = (sx[hit] + 12) + 'px'; tip.style.top = (sy[hit] - 12) + 'px';
+        tip.innerHTML = `<b>${esc(words[hit].w)}</b><span>${CATS[words[hit].ci].name}</span>`;
+      } else tip.style.display = 'none';
+      schedule();
+    }
+  });
+  canvas.addEventListener('pointerup', e => {
+    dragging = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch (_) {}
+    if (S.hover >= 0) select(S.hover);
+  });
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY < 0 ? 1.1 : 0.9;
+    S.view.k *= factor; schedule();
+  }, { passive: false });
+
+  // Legend
+  $('legend').innerHTML = CATS.map((c, i) => `<button type="button" data-ci="${i}">${shapeSVG(i, 12)}<span>${c.name}</span></button>`).join('');
+  $('legend').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    const ci = +b.dataset.ci;
+    if (S.hidden.has(ci)) S.hidden.delete(ci); else S.hidden.add(ci);
+    b.setAttribute('aria-pressed', !S.hidden.has(ci));
+    schedule();
+  });
+
+  // Datalist setup
+  $('wordlist').innerHTML = words.map(w => `<option value="${esc(w.w)}">`).join('');
+
+  // Init
+  // ---- Two models cross-training ----
+  // ORGANIZER: the word vectors, nudged by gradient descent to fit the similarity statistics.
+  // CRITIC: a small neural net that judges whether two words "belong together". It trains on the Organizer's
+  // current vectors, and its gradients flow back into them, so each model keeps pushing the other.
+  const G = new Float32Array(N * N), C = new Float32Array(N * N), tn = words.map(w => norm(w.t));
+  for (let i = 0; i < N; i++) for (let j = i; j < N; j++) { const g = dot(words[i].t, words[j].t), c = g / (tn[i] * tn[j]); G[i * N + j] = G[j * N + i] = g; C[i * N + j] = C[j * N + i] = c; }
+  const NB = 24;  // each word's 24 most similar words (by hidden statistics), kept sorted by insertion
+  const near = words.map((_, i) => {
+    const top = [];
+    for (let j = 0; j < N; j++) {
+      if (j === i) continue;
+      const c = C[i * N + j];
+      if (top.length < NB || c > C[i * N + top[NB - 1]]) {
+        let p = top.length; while (p > 0 && C[i * N + top[p - 1]] < c) p--;
+        top.splice(p, 0, j); if (top.length > NB) top.pop();
+      }
+    }
+    return top;
+  });
+  const pos = near.map(t => t.slice(0, 6));
+  const gr = new Float64Array(320 * DIM), mo = new Float64Array(N * DIM), gC = new Float64Array(N * DIM);
+  const M = { on: false, step: 0, loss: 0, loss0: 0, acc: 0.5, frame: 0, done: false, doubt: null };
+  const LR = 0.05, R = 320, SR = 128;  // R words updated per step, each against its 24 neighbours plus SR random words
+
+  const CD = 2 * DIM, CH = 16, nW1 = CH * CD, B1 = nW1, W2 = nW1 + CH, B2 = nW1 + 2 * CH, P = B2 + 1;
+  const cp = new Float64Array(P), cm = new Float64Array(P), cv = new Float64Array(P), cg = new Float64Array(P);
+  const xin = new Float64Array(CD), hid = new Float64Array(CH), dpre = new Float64Array(CH), dx = new Float64Array(CD);
+  const rr = mulberry32(99), BATCH = 192; let cstep = 0;
+  for (let q = 0; q < nW1; q++) cp[q] = (rr() - 0.5) * 0.4;
+  for (let h = 0; h < CH; h++) cp[W2 + h] = (rr() - 0.5) * 0.4;
+  const rint = n => Math.floor(rr() * n);
+
+  // One pass of the Critic over a batch of word pairs (half related, half unrelated).
+  // trainCritic: update the Critic. feedOrg: collect gradients for the Organizer's vectors.
+  function criticPass(trainCritic, feedOrg) {
+    cg.fill(0); if (feedOrg) gC.fill(0);
+    let right = 0, worst = 2, wa = -1, wb = -1;
+    for (let n = 0; n < BATCH; n++) {
+      const a = rint(N), y = n % 2 === 0 ? 1 : 0; let b;
+      if (y) b = pos[a][rint(pos[a].length)]; else { do { b = rint(N); } while (b === a || C[a * N + b] > 0.15); }
+      const oa = a * DIM, ob = b * DIM;
+      for (let k = 0; k < DIM; k++) { xin[k] = buf[oa + k] * buf[ob + k]; const d = buf[oa + k] - buf[ob + k]; xin[DIM + k] = d * d; }
+      let z = cp[B2];
+      for (let h = 0; h < CH; h++) { let t = cp[B1 + h]; const o = h * CD; for (let k = 0; k < CD; k++) t += cp[o + k] * xin[k]; hid[h] = Math.tanh(t); z += cp[W2 + h] * hid[h]; }
+      const p = 1 / (1 + Math.exp(-z)), dz = p - y;
+      if ((p > 0.5) === (y === 1)) right++;
+      if (y && p < worst) { worst = p; wa = a; wb = b; }
+      cg[B2] += dz;
+      for (let h = 0; h < CH; h++) {
+        cg[W2 + h] += dz * hid[h]; dpre[h] = dz * cp[W2 + h] * (1 - hid[h] * hid[h]); cg[B1 + h] += dpre[h];
+        const o = h * CD; for (let k = 0; k < CD; k++) cg[o + k] += dpre[h] * xin[k];
+      }
+      if (feedOrg) {
+        dx.fill(0);
+        for (let h = 0; h < CH; h++) { const o = h * CD; for (let k = 0; k < CD; k++) dx[k] += cp[o + k] * dpre[h]; }
+        for (let k = 0; k < DIM; k++) {
+          const d = buf[oa + k] - buf[ob + k];
+          gC[oa + k] += dx[k] * buf[ob + k] + dx[DIM + k] * 2 * d; gC[ob + k] += dx[k] * buf[oa + k] - dx[DIM + k] * 2 * d;
+        }
+      }
+    }
+    if (trainCritic) {
+      cstep++;
+      for (let q = 0; q < P; q++) {
+        const g = cg[q] / BATCH; cm[q] = 0.9 * cm[q] + 0.1 * g; cv[q] = 0.999 * cv[q] + 0.001 * g * g;
+        cp[q] -= 0.01 * (cm[q] / (1 - Math.pow(0.9, cstep))) / (Math.sqrt(cv[q] / (1 - Math.pow(0.999, cstep))) + 1e-8);
+      }
+    }
+    return { acc: right / BATCH, worst, wa, wb };
+  }
+
+  const rowIdx = new Int32Array(R);
+  function trainStep() {
+    // The Critic learns from the current vectors; the same pass collects its feedback for the Organizer.
+    const r = criticPass(true, true);
+    M.acc = M.step ? 0.95 * M.acc + 0.05 * r.acc : r.acc; M.doubt = r.worst < 0.5 ? [r.wa, r.wb] : null; M.doubtP = r.worst;
+    // Organizer: take a random batch of words and nudge each so its dot products match the similarity statistics.
+    let loss = 0;
+    for (let s = 0; s < R; s++) {
+      const i = rint(N), oi = i * DIM, os = s * DIM; rowIdx[s] = i;
+      for (let k = 0; k < DIM; k++) gr[os + k] = 0;
+      const nn = near[i];
+      for (let q = 0; q < NB + SR; q++) {
+        const j = q < NB ? nn[q] : rint(N), oj = j * DIM; let d = 0;
+        for (let k = 0; k < DIM; k++) d += buf[oi + k] * buf[oj + k];
+        const e = d - G[i * N + j]; loss += e * e;
+        for (let k = 0; k < DIM; k++) gr[os + k] += e * buf[oj + k];
+      }
+    }
+    for (let s = 0; s < R; s++) { const oi = rowIdx[s] * DIM, os = s * DIM; for (let k = 0; k < DIM; k++) buf[oi + k] -= LR * gr[os + k] / (NB + SR); }
+    for (let q = 0; q < buf.length; q++) buf[q] -= Math.max(-0.01, Math.min(0.01, 0.004 * gC[q]));
+    const l = loss / (R * (NB + SR)); M.loss = M.step ? 0.95 * M.loss + 0.05 * l : l; if (!M.loss0) M.loss0 = M.loss;
+  }
+
+  // ---- Second pair: ANALOGIST and JUDGE ----
+  // ANALOGIST: a small neural net that reads the vectors of A, B and C and writes a vector for the answer D.
+  // JUDGE: a small neural net that scores whether D really completes "A is to B as C is to D".
+  // The Judge trains on right answers and on wrong ones (including the Analogist's own mistakes); its gradient
+  // flows back into the Analogist, alongside the answer key. Both read the Organizer's current vectors.
+  const wi = new Map(); words.forEach((w, i) => { if (!wi.has(w.w)) wi.set(w.w, i); });
+  const REL = [];
+  for (const k in words.rels) {
+    // No pairs are held back: the Analogist trains on every known word pair, and is quizzed on the same full set.
+    const tr = words.rels[k].map(([a, b]) => [wi.get(a), wi.get(b)]).filter(p => p[0] !== undefined && p[1] !== undefined);
+    const flip = l => l.map(p => [p[1], p[0]]);
+    if (tr.length >= 3) { REL.push({ name: k, tr, te: tr, all: tr }); REL.push({ name: k + ' reversed', tr: flip(tr), te: flip(tr), all: flip(tr) }); }
+  }
+  // Every word takes part. Words in a known relation (gender, young, capital, past tense) get exact-answer analogies;
+  // every other word gets a "same kind" analogy, where the answer is any of C's closest relatives by meaning.
+  const relWords = new Set(); REL.forEach(r => r.all.forEach(p => { relWords.add(p[0]); relWords.add(p[1]); }));
+  const practised = new Set(); let allSeenLogged = false;
+  const SIB = 8, sibs = near.map(l => new Set(l.slice(0, SIB)));
+  const pairsOf = new Map();  // word -> [relation, pair] entries where the word is C
+  REL.forEach(r => r.all.forEach(p => { if (!pairsOf.has(p[0])) pairsOf.set(p[0], []); pairsOf.get(p[0]).push([r, p]); }));
+  // A question: [a, b, c, d, kind]. kind 0: exact relation. kind 1: "same kind" (any word in sibs[c] is right).
+  function quadFor(w) {
+    const rel = pairsOf.get(w);
+    if (rel && rr() < 0.7) {
+      const [r, q] = rel[rint(rel.length)]; let p, g = 0;
+      do { p = r.all[rint(r.all.length)]; } while ((p[0] === q[0] || p[1] === q[1] || p[0] === q[1] || p[1] === q[0]) && ++g < 20);
+      return [p[0], p[1], q[0], q[1], 0];
+    }
+    let a, b, d, g = 0;
+    do { a = rint(N); b = near[a][rint(SIB)]; d = near[w][rint(SIB)]; } while ((a === w || b === w || a === d || b === d) && ++g < 20);
+    return [a, b, w, d, 1];
+  }
+  // Each model walks through a freshly shuffled deck of all words, so none is skipped; the deck reshuffles when it runs out.
+  const mkDeck = () => ({ d: [], i: 0, rounds: 0 });
+  const deckA = mkDeck(), deckJ = mkDeck();
+  function nextWord(dk) {
+    if (dk.i >= dk.d.length) { dk.d = Array.from({ length: N }, (_, i) => i); for (let i = N - 1; i > 0; i--) { const j = rint(i + 1), t = dk.d[i]; dk.d[i] = dk.d[j]; dk.d[j] = t; } dk.i = 0; dk.rounds++; }
+    return dk.d[dk.i++];
+  }
+  const isRight = (q, g) => q[4] ? sibs[q[2]].has(g) && g !== q[0] && g !== q[1] : g === q[3];
+  const catIdx = CATS.map((_, ci) => words.map((w, i) => i).filter(i => words[i].ci === ci));
+  const sig = z => 1 / (1 + Math.exp(-z));
+
+  // Analogist: [vA; vB; vC] -> tanh layer -> answer vector, plus a direct linear path
+  const AH = 48, AIN = 3 * DIM, aW1 = AH * AIN, aB1 = aW1, aW2 = aB1 + AH, aB2 = aW2 + DIM * AH, aWS = aB2 + DIM, AP = aWS + DIM * AIN;
+  const ap = new Float64Array(AP), am = new Float64Array(AP), av = new Float64Array(AP), ag = new Float64Array(AP);
+  for (let q = 0; q < aW1; q++) ap[q] = (rr() - 0.5) * 0.2;
+  for (let q = aW2; q < aW2 + DIM * AH; q++) ap[q] = (rr() - 0.5) * 0.2;
+  for (let q = aWS; q < AP; q++) ap[q] = (rr() - 0.5) * 0.1;
+  const ax = new Float64Array(AIN), ah = new Float64Array(AH), ao = new Float64Array(DIM), gout = new Float64Array(DIM), adh = new Float64Array(AH);
+  function anaFwd(a, b, c) {
+    ax.set(buf.subarray(a * DIM, a * DIM + DIM), 0); ax.set(buf.subarray(b * DIM, b * DIM + DIM), DIM); ax.set(buf.subarray(c * DIM, c * DIM + DIM), 2 * DIM);
+    for (let h = 0; h < AH; h++) { let t = ap[aB1 + h]; const o = h * AIN; for (let k = 0; k < AIN; k++) t += ap[o + k] * ax[k]; ah[h] = Math.tanh(t); }
+    for (let k = 0; k < DIM; k++) {
+      let t = ap[aB2 + k]; const o = aW2 + k * AH, s = aWS + k * AIN;
+      for (let h = 0; h < AH; h++) t += ap[o + h] * ah[h];
+      for (let q = 0; q < AIN; q++) t += ap[s + q] * ax[q];
+      ao[k] = t;
+    }
+    return ao;
+  }
+  function anaBack() {  // gradient of the loss w.r.t. its output is in gout; uses the last anaFwd's ax and ah
+    adh.fill(0);
+    for (let k = 0; k < DIM; k++) {
+      const g = gout[k], o = aW2 + k * AH, s = aWS + k * AIN; ag[aB2 + k] += g;
+      for (let h = 0; h < AH; h++) { ag[o + h] += g * ah[h]; adh[h] += g * ap[o + h]; }
+      for (let q = 0; q < AIN; q++) ag[s + q] += g * ax[q];
+    }
+    for (let h = 0; h < AH; h++) { const dp = adh[h] * (1 - ah[h] * ah[h]), o = h * AIN; ag[aB1 + h] += dp; for (let k = 0; k < AIN; k++) ag[o + k] += dp * ax[k]; }
+  }
+
+  // Judge: features from the two relations (B-A) and (D-C): their product and squared difference
+  const JH = 16, JIN = 2 * DIM, jW1 = JH * JIN, jB1 = jW1, jW2 = jB1 + JH, jB2 = jW2 + JH, JP = jB2 + 1;
+  const jp = new Float64Array(JP), jm = new Float64Array(JP), jv = new Float64Array(JP), jg = new Float64Array(JP);
+  for (let q = 0; q < jW1; q++) jp[q] = (rr() - 0.5) * 0.4;
+  for (let h = 0; h < JH; h++) jp[jW2 + h] = (rr() - 0.5) * 0.4;
+  const jx = new Float64Array(JIN), jh = new Float64Array(JH), jdp = new Float64Array(JH), jdx = new Float64Array(JIN);
+  function judgeZ(a, b, c, dv) {
+    for (let k = 0; k < DIM; k++) { const u = buf[b * DIM + k] - buf[a * DIM + k], w = dv[k] - buf[c * DIM + k]; jx[k] = u * w; jx[DIM + k] = (u - w) * (u - w); }
+    let z = jp[jB2];
+    for (let h = 0; h < JH; h++) { let t = jp[jB1 + h]; const o = h * JIN; for (let k = 0; k < JIN; k++) t += jp[o + k] * jx[k]; jh[h] = Math.tanh(t); z += jp[jW2 + h] * jh[h]; }
+    return z;
+  }
+  // After judgeZ: backprop dz. Fills jg (if learn) and/or gd = gradient w.r.t. the answer vector (if gd given).
+  function judgeBack(dz, a, b, c, dv, learn, gd) {
+    if (learn) jg[jB2] += dz;
+    if (gd) jdx.fill(0);
+    for (let h = 0; h < JH; h++) {
+      jdp[h] = dz * jp[jW2 + h] * (1 - jh[h] * jh[h]); const o = h * JIN;
+      if (learn) { jg[jW2 + h] += dz * jh[h]; jg[jB1 + h] += jdp[h]; for (let k = 0; k < JIN; k++) jg[o + k] += jdp[h] * jx[k]; }
+      if (gd) for (let k = 0; k < JIN; k++) jdx[k] += jp[o + k] * jdp[h];
+    }
+    if (gd) for (let k = 0; k < DIM; k++) { const u = buf[b * DIM + k] - buf[a * DIM + k], w = dv[k] - buf[c * DIM + k]; gd[k] = jdx[k] * u - 2 * jdx[DIM + k] * (u - w); }
+  }
+  let adamT = 0;
+  function adam(p, m, v, g, n, scale, lr) {
+    const c1 = 1 - Math.pow(0.9, adamT), c2 = 1 - Math.pow(0.999, adamT);
+    for (let q = 0; q < n; q++) { const gg = g[q] * scale; m[q] = 0.9 * m[q] + 0.1 * gg; v[q] = 0.999 * v[q] + 0.001 * gg * gg; p[q] -= lr * (m[q] / c1) / (Math.sqrt(v[q] / c2) + 1e-8); g[q] = 0; }
+  }
+  // Nearest word to a vector by cosine similarity, skipping up to three words (the question's own A, B and C)
+  function snap(vec, e0, e1, e2) {
+    let best = -1, bs = -2;
+    for (let j = 0; j < N; j++) {
+      if (j === e0 || j === e1 || j === e2) continue;
+      const o = j * DIM; let d = 0, nj = 0;
+      for (let k = 0; k < DIM; k++) { const x = buf[o + k]; d += vec[k] * x; nj += x * x; }
+      const s = d / (Math.sqrt(nj) || 1); if (s > bs) { bs = s; best = j; }
+    }
+    return best;
+  }
+  const AB = 250, JB = 250, LAM = 2;  // about N / 12 questions per step, so every word is covered every dozen steps
+  const AN = { acc: 0, base: 0, jacc: 0.5, tested: 0, evals: 0 };
+  const gdv = new Float64Array(DIM), tvec = new Float64Array(DIM), avec = new Float64Array(DIM);
+
+  function analogyStep() {
+    adamT++;
+    const trust = Math.max(0, AN.jacc - 0.5) * 2;
+    // Analogist: match the answer key, and try to earn the Judge's approval
+    for (let n = 0; n < AB; n++) {
+      const [a, b, c, d] = quadFor(nextWord(deckA));
+      practised.add(a); practised.add(b); practised.add(c); practised.add(d);
+      const out = anaFwd(a, b, c);
+      const z = judgeZ(a, b, c, out), p = sig(z);
+      judgeBack(trust * (p - 1), a, b, c, out, false, gdv);  // the Judge's say grows with its own accuracy
+      for (let k = 0; k < DIM; k++) gout[k] = LAM * 2 * (out[k] - buf[d * DIM + k]) + gdv[k];
+      anaBack();
+    }
+    adam(ap, am, av, ag, AP, 1 / AB, 0.01);
+    // Judge: right answers versus wrong ones, some of them the Analogist's own mistakes
+    let right = 0, snaps = 0;
+    for (let n = 0; n < JB; n++) {
+      const qj = quadFor(nextWord(deckJ)), [a, b, c, d] = qj, y = n % 2 === 0 ? 1 : 0; let e = d;
+      if (!y) {
+        const t = rr(), cat = catIdx[words[d].ci];
+        if (t < 0.4 && snaps < 6) { snaps++; const out = anaFwd(a, b, c); e = snap(out, a, b, c); }
+        else if (t < 0.15 + 0.4) e = cat[rint(cat.length)];
+        else e = rint(N);
+        if (e === d || e === a || e === b || e === c || (qj[4] && sibs[c].has(e))) { const cat2 = catIdx[words[d].ci]; do { e = cat2[rint(cat2.length)]; } while (e === d || e === a || e === b || e === c || (qj[4] && sibs[c].has(e))); }
+      }
+      const dv = buf.subarray(e * DIM, e * DIM + DIM);
+      const z = judgeZ(a, b, c, dv), p = sig(z);
+      if ((p > 0.5) === (y === 1)) right++;
+      judgeBack(p - y, a, b, c, dv, true, null);
+    }
+    adam(jp, jm, jv, jg, JP, 1 / JB, 0.01);
+    AN.jacc = AN.tested || AN.evals ? 0.95 * AN.jacc + 0.05 * right / JB : right / JB;
+  }
+
+  // Quiz the Analogist (and plain vector arithmetic) on analogies built around randomly chosen words from the whole vocabulary.
+  const lastSeen = { rej: '', fool: '' };
+  function evalAnalogist() {
+    let ok = 0, base = 0, n = 60, wrong = [];
+    for (let t = 0; t < n; t++) {
+      const q = quadFor(rint(N)), [a, b, c, d] = q, out = anaFwd(a, b, c);
+      avec.set(out); const g = snap(avec, a, b, c);
+      for (let k = 0; k < DIM; k++) tvec[k] = buf[b * DIM + k] - buf[a * DIM + k] + buf[c * DIM + k];
+      if (isRight(q, snap(tvec, a, b, c))) base++;
+      if (isRight(q, g)) ok++; else wrong.push([a, b, c, g]);
+    }
+    const first = !AN.evals; AN.evals++;
+    AN.acc = first ? ok / n : 0.6 * AN.acc + 0.4 * ok / n; AN.base = first ? base / n : 0.6 * AN.base + 0.4 * base / n;
+    let verdict = null;
+    if (wrong.length) {
+      const w = wrong[rint(wrong.length)], p = sig(judgeZ(w[0], w[1], w[2], buf.subarray(w[3] * DIM, w[3] * DIM + DIM)));
+      verdict = { w, p };
+    }
+    return verdict;
+  }
+  function judgeP(a, b, c, i) { return sig(judgeZ(a, b, c, buf.subarray(i * DIM, i * DIM + DIM))); }
+  function analogistAnswer(a, b, c) { avec.set(anaFwd(a, b, c)); return snap(avec, a, b, c); }
+  const anaMarks = [0.1, 0.25, 0.5, 0.75, 0.9], judMarks = [0.6, 0.7, 0.8, 0.9, 0.95];
+  let anaChecks = 0;
+  const qd = w => `“${words[w[0]].w} : ${words[w[1]].w} :: ${words[w[2]].w} : ${words[w[3]].w}”`;
+  function checkAna() {
+    if (++anaChecks % 2) return;
+    const v = evalAnalogist();
+    while (anaMarks.length && AN.acc >= anaMarks[0]) log('ana', `Now solves ${Math.round(anaMarks.shift() * 100)}% of analogies built around words from across all ${N.toLocaleString()} (plain vector arithmetic: ${Math.round(AN.base * 100)}%).`);
+    if (!allSeenLogged && practised.size >= N) { allSeenLogged = true; log('ana', `Has now trained on every one of the ${N.toLocaleString()} words. It keeps cycling through all of them.`); }
+    while (judMarks.length && AN.jacc >= judMarks[0]) log('jdg', `Now ${Math.round(judMarks.shift() * 100)}% accurate at telling right analogy answers from wrong ones.`);
+    if (v && AN.evals > 1) {
+      const key = qd(v.w);
+      if (v.p < 0.3 && key !== lastSeen.rej && anaChecks % 4 === 0) { lastSeen.rej = key; log('jdg', `Rejected the Analogist's answer ${key} (${Math.round(v.p * 100)}% likely right). Sent this back to the Analogist.`); }
+      else if (v.p > 0.65 && key !== lastSeen.fool) { lastSeen.fool = key; log('ana', `Got ${key} past the Judge (${Math.round(v.p * 100)}% likely right), but it is wrong. The Judge will learn from it.`); }
+    }
+  }
+
+  // ---- Changelog: what each model did, in plain words ----
+  const LOG = [], doneCats = new Set(), accMarks = [0.6, 0.7, 0.8, 0.9, 0.95, 0.99], errMarks = [0.25, 0.5, 0.75, 0.9, 0.95];
+  let logFilter = 'all', logDirty = true, lastCheck = 0, lastDoubt = -1, checks = 0;
+  const posPairs = []; words.forEach((_, i) => pos[i].forEach(j => posPairs.push([i, j])));
+  const negPairs = []; for (let n = 0; n < 1500; n++) { const a = rint(N); let b; do { b = rint(N); } while (b === a || C[a * N + b] > 0.15); negPairs.push([a, b]); }
+  const cosNow = pairs => Float32Array.from(pairs, q => cosine(words[q[0]].v, words[q[1]].v));
+  let posSnap = cosNow(posPairs), negSnap = cosNow(negPairs);
+  const quote = i => '\u201c' + words[i].w + '\u201d';
+  function log(who, msg) { LOG.unshift({ who, msg, step: M.step }); if (LOG.length > 200) LOG.pop(); logDirty = true; }
+
+  function checkLog() {
+    lastCheck = M.step; checks++;
+    const prog = M.loss0 ? 1 - M.loss / M.loss0 : 0;
+    // Organizer: the biggest pull-together or push-apart since the last check
+    const pn = cosNow(posPairs), nn = cosNow(negPairs);
+    let pi = -1, pg = 0.08, ni = -1, ng = 0.08;
+    for (let q = 0; q < pn.length; q++) { const g = pn[q] - posSnap[q]; if (g > pg) { pg = g; pi = q; } }
+    for (let q = 0; q < nn.length; q++) { const g = negSnap[q] - nn[q]; if (g > ng) { ng = g; ni = q; } }
+    if (pi >= 0 && pg >= ng) log('org', `Pulled ${quote(posPairs[pi][0])} and ${quote(posPairs[pi][1])} together (similarity ${posSnap[pi].toFixed(2)} to ${pn[pi].toFixed(2)}).`);
+    else if (ni >= 0) log('org', `Pushed ${quote(negPairs[ni][0])} and ${quote(negPairs[ni][1])} apart (similarity ${negSnap[ni].toFixed(2)} to ${nn[ni].toFixed(2)}).`);
+    posSnap = pn; negSnap = nn;
+    const cs = new Float64Array(CATS.length), cn = new Float64Array(CATS.length);
+    for (let q = 0; q < posPairs.length; q++) { const ci = words[posPairs[q][0]].ci; cs[ci] += pn[q]; cn[ci]++; }
+    CATS.forEach((c, ci) => {
+      if (!doneCats.has(ci) && cn[ci] && cs[ci] / cn[ci] > 0.5) { doneCats.add(ci); log('org', `${c.name} are now grouped together (neighbour similarity ${(cs[ci] / cn[ci]).toFixed(2)}).`); }
+    });
+    while (errMarks.length && prog >= errMarks[0]) log('org', `Error against the similarity statistics is down ${Math.round(errMarks.shift() * 100)}%.`);
+    // Critic: accuracy milestones and the pair it currently doubts
+    while (accMarks.length && M.acc >= accMarks[0]) log('crit', `Now ${Math.round(accMarks.shift() * 100)}% accurate at telling related word pairs from random ones.`);
+    if (M.doubt) {
+      const key = M.doubt[0] * N + M.doubt[1];
+      if (key !== lastDoubt && checks % 3 === 0) { lastDoubt = key; log('crit', `Doubts ${quote(M.doubt[0])} and ${quote(M.doubt[1])}: they should be related but look unrelated (confidence ${((1 - M.doubtP) * 100).toFixed(0)}%). Sent this back to the Organizer.`); }
+    } else if (lastDoubt !== -1) { lastDoubt = -1; log('crit', 'No objections: every sampled related pair looks right.'); }
+    checkAna();
+  }
+
+  function renderLog() { return;
+    if (!logDirty) return; logDirty = false;
+    const rows = LOG.filter(e => logFilter === 'all' || e.who === logFilter).slice(0, 100);
+    $('logbox').innerHTML = rows.length ? rows.map(e => `<div class="log-row"><span class="tag ${e.who}">${e.who === 'org' ? 'Organizer' : e.who === 'crit' ? 'Critic' : e.who === 'ana' ? 'Analogist' : e.who === 'jdg' ? 'Judge' : 'System'}</span><span>${esc(e.msg)} <span class="stp">step ${e.step}</span></span></div>`).join('')
+      : '<p class="fine">Nothing here yet.</p>';
+  }
+  log('crit', 'Starts untrained: 50% accuracy means it is only guessing.');
+  log('org', 'Starts with a random vector for every word, so nothing is grouped yet.');
+  log('ana', 'Starts untrained: its answers to analogies are random guesses.');
+  log('jdg', 'Starts untrained: 50% accuracy means it is only guessing.');
+  renderLog();
+
+  function alignTo(next, prev) {
+    let a = 0, b = 0, c = 0, d = 0;
+    for (let i = 0; i < N; i++) { a += next[i][0] * prev[i][0]; b += next[i][0] * prev[i][1]; c += next[i][1] * prev[i][0]; d += next[i][1] * prev[i][1]; }
+    const sw = Math.abs(b) + Math.abs(c) > Math.abs(a) + Math.abs(d), sg = x => x < 0 ? -1 : 1;
+    if (sw) { const s0 = sg(c), s1 = sg(b); return next.map(p => [s0 * p[1], s1 * p[0]]); }
+    const s0 = sg(a), s1 = sg(d); return next.map(p => [s0 * p[0], s1 * p[1]]);
+  }
+  function liveLayout() {
+    pcaRes = pca(words.map(w => w.v), 3, pcaRes.comps);
+    layouts.pca = alignTo(normalize(pcaRes.coords.map(c => [c[0], c[1]])), layouts.pca);
+    layouts.tsne = null;
+  }
+
+  function updateTrainUI() {
+    const p = M.loss0 ? Math.max(0, 1 - M.loss / M.loss0) : 0;
+    $('meterfill').style.width = (p * 100).toFixed(1) + '%';
+    $('meterfill2').style.width = (M.acc * 100).toFixed(1) + '%';
+    $('orgval').textContent = M.step ? `error -${(p * 100).toFixed(0)}%` : 'random';
+    $('crival').textContent = M.step ? `${(M.acc * 100).toFixed(0)}% right` : 'untrained';
+    $('meterfill3').style.width = (AN.acc * 100).toFixed(1) + '%'; $('meterfill4').style.width = (AN.jacc * 100).toFixed(1) + '%';
+    $('anaval').textContent = AN.evals ? `${(AN.acc * 100).toFixed(0)}% solved` : 'untrained';
+    $('judval').textContent = M.step ? `${(AN.jacc * 100).toFixed(0)}% right` : 'untrained';
+    $('trainstat').textContent = !M.step ? 'Both models are untrained. The Critic cannot tell related words from random ones yet.'
+      : `Training continuously, step ${M.step}.`;
+  }
+
+  // Speed dial: 0.1x to 10x training steps per frame, on a log scale (middle = 1x).
+  let speed = 1, owed = 0;
+  const dial = $('speed');
+  function setSpeed() {
+    speed = Math.pow(10, (+dial.value - 50) / 50);
+    $('speedval').textContent = speed.toFixed(speed < 1 ? 2 : 1) + '\u00d7';
+  }
+  dial.addEventListener('input', setSpeed); setSpeed();
+
+  function tick() {
+    if (!M.on) return;
+    const t0 = performance.now();
+    owed = Math.min(owed + speed, 12);
+    while (owed >= 1 && performance.now() - t0 < 45) { trainStep(); analogyStep(); M.step++; owed--; }
+    if (M.step - lastCheck >= 40) { checkLog(); renderLog(); }
+    liveLayout();
+    if ((S.mode === 'pca' || S.mode === 'axes') && !S.to) {
+      if (S.mode === 'axes') recomputeAxes();
+      const L = layouts[S.mode];
+      for (let i = 0; i < N; i++) { S.cur[i][0] += (L[i][0] - S.cur[i][0]) * 0.3; S.cur[i][1] += (L[i][1] - S.cur[i][1]) * 0.3; }
+    }
+    if (++M.frame % (M.step < 3000 ? 10 : 45) === 0) { renderWord(); renderAnalogy(); }
+    updateTrainUI(); schedule();
+    if (M.on) requestAnimationFrame(tick);
+  }
+
+
+  readTheme(); resize(); renderWord(); renderAnalogy(); switchMode('pca'); updateTrainUI();
+  // Starts random, then both models train forever, with no controls to stop them.
+  setTimeout(() => { M.on = true; requestAnimationFrame(tick); }, 1500);
+})();
+
+// Rating and visitor counts, kept on Abacus (free public counters). One rating per browser; one visitor count per browser.
+(function () {
+  const API = 'https://abacus.jasoncameron.dev', NS = 'word-embedding-viz-k7q3x9';
+  const hit = k => fetch(`${API}/hit/${NS}/${k}`).then(r => { if (!r.ok) throw new Error('hit'); return r.json(); });
+  const read = k => fetch(`${API}/get/${NS}/${k}`).then(r => r.ok ? r.json() : { value: 0 }).then(j => +j.value || 0).catch(() => null);
+  const ls = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} }, del(k) { try { localStorage.removeItem(k); } catch (_) {} } };
+
+  // Visitors: once per browser. Page loads: once per tab session.
+  if (!ls.get('wev-visited')) { hit('visitors').then(() => ls.set('wev-visited', '1')).catch(() => {}); }
+  let first = true; try { first = !sessionStorage.getItem('wev-session'); sessionStorage.setItem('wev-session', '1'); } catch (_) {}
+  if (first) hit('visits').catch(() => {});
+
+  // Stars
+  const box = document.getElementById('stars'), msg = document.getElementById('rate-msg');
+  const WORDS = ['', 'Poor', 'Fair', 'Good', 'Very good', 'Excellent'];
+  let val = +ls.get('wev-rating') || 0, note = '', sending = false;
+  const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.7 6.1 20.8l1.2-6.5L2.5 9.7l6.6-.9z"/></svg>';
+  box.innerHTML = [1, 2, 3, 4, 5].map(n => `<button type="button" role="radio" data-n="${n}" aria-label="${n} star${n > 1 ? 's' : ''}, ${WORDS[n]}">${STAR}</button>`).join('');
+  const btns = [...box.querySelectorAll('button')];
+  const paint = n => btns.forEach((b, i) => b.classList.toggle('on', i < n));
+  function show() {
+    paint(val);
+    btns.forEach((b, i) => { b.setAttribute('aria-checked', String(i + 1 === val)); b.tabIndex = (val ? i + 1 === val : i === 0) ? 0 : -1; b.style.cursor = val ? 'default' : 'pointer'; });
+    msg.textContent = val ? `You rated this ${val} out of 5 (${WORDS[val]}). ${note}` : (note || 'How good is this visualizer? Pick 1 to 5 stars.');
+  }
+  function set(n) {
+    if (val || sending) { note = 'Your rating was already sent and cannot be changed.'; show(); return; }
+    sending = true; val = n; note = 'Sending\u2026'; show();
+    hit('stars' + n).then(() => { ls.set('wev-rating', String(n)); note = 'Sent, thank you.'; })
+      .catch(() => { val = 0; note = 'Could not send your rating. Check your connection and try again.'; })
+      .finally(() => { sending = false; show(); });
+  }
+  btns.forEach((b, i) => {
+    b.addEventListener('click', () => set(i + 1));
+    b.addEventListener('mouseenter', () => { if (!val) paint(i + 1); });
+    b.addEventListener('mouseleave', () => paint(val));
+    b.addEventListener('keydown', e => {
+      const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+      if (d && !val) { e.preventDefault(); const n = Math.min(5, Math.max(1, (i + 1) + d)); btns[n - 1].focus(); paint(n); }
+    });
+  });
+  show();
+
+  // Stats panel
+  const panel = document.getElementById('results'), toggle = document.getElementById('stats-toggle');
+  async function loadStats() {
+    document.getElementById('res-count').textContent = 'Loading\u2026';
+    const [c1, c2, c3, c4, c5, vis, visits] = await Promise.all(['stars1', 'stars2', 'stars3', 'stars4', 'stars5', 'visitors', 'visits'].map(read));
+    const counts = [0, c1, c2, c3, c4, c5], ok = [c1, c2, c3, c4, c5].every(v => v !== null);
+    const n = ok ? counts.reduce((t, v) => t + v, 0) : 0, sum = ok ? counts.reduce((t, v, i) => t + v * i, 0) : 0;
+    document.getElementById('res-avg').textContent = n ? (sum / n).toFixed(1) : '\u2013';
+    document.getElementById('res-count').textContent = !ok ? 'Could not reach the counter service.' : n ? `${n} rating${n > 1 ? 's' : ''}` : 'No ratings yet.';
+    document.getElementById('res-dist').innerHTML = ok ? [5, 4, 3, 2, 1].map(s => `<div class="drow"><span>${s} \u2605</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${n ? counts[s] / n * 100 : 0}%"></span></span><span class="val">${counts[s]}</span></div>`).join('') : '';
+    document.getElementById('res-vis').textContent = vis === null ? '\u2013' : vis.toLocaleString();
+    document.getElementById('res-visits').textContent = visits === null ? '\u2013' : visits.toLocaleString();
+  }
+  function open(on) { panel.hidden = !on; toggle.setAttribute('aria-expanded', String(on)); if (on) { loadStats(); panel.scrollIntoView({ block: 'nearest' }); } }
+  toggle.addEventListener('click', () => open(panel.hidden));
+  document.getElementById('res-refresh').addEventListener('click', loadStats);
+  if (location.hash === '#stats') open(true);
+})();
+</script>
+<!-- ait-feedback: visit counter + rating (CounterAPI). Change NS to your own unique name. -->
+<style>
+.ait-fb{max-width:960px;margin:32px auto 0;padding:16px 4px 8px;border-top:1px solid rgba(128,128,128,.35);display:flex;flex-wrap:wrap;gap:10px 28px;align-items:center;justify-content:space-between;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:inherit;box-sizing:border-box}
+.ait-fb *{box-sizing:border-box}
+.ait-fb .ait-v{opacity:.8}
+.ait-fb .ait-v b{font-weight:700;opacity:1}
+.ait-fb .ait-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ait-fb .ait-stars{display:inline-flex}
+.ait-fb .ait-stars button{all:unset;cursor:pointer;font-size:24px;line-height:1;padding:2px 1px;color:currentColor;opacity:.28;transition:transform .1s}
+.ait-fb .ait-stars button.on{color:#e0a100;opacity:1}
+.ait-fb .ait-stars button:hover{transform:scale(1.15)}
+.ait-fb .ait-stars button:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:3px}
+.ait-fb .ait-stars.done button{cursor:default}
+.ait-fb .ait-stars.done button:hover{transform:none}
+.ait-fb .ait-t{opacity:.8}
+@media (prefers-reduced-motion:reduce){.ait-fb .ait-stars button{transition:none}}
+</style>
+<div class="ait-fb" id="aitFb" aria-label="Visits and rating">
+  <div class="ait-v" id="aitV">Visits: <b>…</b></div>
+  <div class="ait-r"><span class="ait-stars" id="aitS" role="group" aria-label="Rate this page"></span><span class="ait-t" id="aitT">Loading rating…</span></div>
+</div>
+<script>
+(function(){
+  var NS='aitoys-7k2q9x',PAGE='word-map',BASE='https://api.counterapi.dev/v1/'+NS+'/';
+  function store(){try{return window.localStorage}catch(e){return null}}
+  function sess(){try{return window.sessionStorage}catch(e){return null}}
+  function val(j){
+    if(!j)return null;
+    var v=j.count!=null?j.count:j.value!=null?j.value:(j.data&&j.data.up_count!=null?j.data.up_count:null);
+    return v==null?null:+v;
+  }
+  // act: 'up' to add one, '' to just read. A counter that does not exist yet reads as 0.
+  function hit(name,act){
+    return fetch(BASE+PAGE+'-'+name+'/'+(act||'')).then(function(r){
+      if(r.status===404)return 0;
+      if(!r.ok)throw new Error('http '+r.status);
+      return r.json().then(val);
+    });
+  }
+  var V=document.getElementById('aitV'),S=document.getElementById('aitS'),T=document.getElementById('aitT');
+  var fmt=function(n){return n==null?'–':Number(n).toLocaleString()};
+
+  /* visits: count once per browser session */
+  var ss=sess(),key='ait_visit_'+PAGE,seen=ss&&ss.getItem(key);
+  hit('visits',seen?'':'up').then(function(n){V.innerHTML='Visits: <b>'+fmt(n)+'</b>';if(ss&&!seen)ss.setItem(key,'1')})
+    .catch(function(){V.innerHTML='Visits: <b>–</b>'});
+
+  /* rating: five counters, one per star value */
+  var counts=[0,0,0,0,0],loaded=false,ls=store(),vkey='ait_rated_'+PAGE;
+  var mine=ls?+ls.getItem(vkey)||0:0,hover=0;
+  var btns=[];
+  for(var i=1;i<=5;i++)(function(n){
+    var b=document.createElement('button');b.type='button';b.textContent='★';b.setAttribute('aria-label',n+(n===1?' star':' stars'));
+    b.onclick=function(){vote(n)};
+    b.onmouseenter=function(){if(!mine){hover=n;paint()}};
+    b.onfocus=b.onmouseenter;
+    b.onmouseleave=b.onblur=function(){hover=0;paint()};
+    btns.push(b);S.appendChild(b);
+  })(i);
+  function stats(){
+    var tot=0,sum=0;counts.forEach(function(c,i){tot+=c;sum+=c*(i+1)});
+    return {tot:tot,avg:tot?sum/tot:0};
+  }
+  function paint(){
+    var st=stats(),shown=hover||mine||Math.round(st.avg);
+    btns.forEach(function(b,i){b.classList.toggle('on',i<shown)});
+    S.classList.toggle('done',!!mine);
+    if(!loaded){T.textContent='Rating unavailable';return}
+    T.textContent=(st.tot?st.avg.toFixed(1)+' / 5 · '+st.tot.toLocaleString()+(st.tot===1?' rating':' ratings'):'No ratings yet')+(mine?' · you gave '+mine+'★':'');
+  }
+  function vote(n){
+    if(mine||!loaded)return;
+    mine=n;counts[n-1]++;hover=0;paint();
+    if(ls)try{ls.setItem(vkey,String(n))}catch(e){}
+    hit('r'+n,'up').catch(function(){});
+  }
+  Promise.all([1,2,3,4,5].map(function(n){return hit('r'+n,'')})).then(function(a){
+    counts=a.map(function(x){return x||0});
+    if(mine&&!counts[mine-1])counts[mine-1]=1;
+    loaded=true;paint();
+  }).catch(function(){loaded=false;paint()});
+  paint();
+})();
+</script>
+</body>
+</html>
