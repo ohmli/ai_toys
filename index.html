@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AI Toys</title>
+<meta name="description" content="Small interactive toys that make machine learning click.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🧸%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif&display=swap">
+<style>
+:root{
+  --bg:#eef1f5;--plate:#f8fafc;--ink:#131a26;--muted:#5b6676;--line:#d3d9e2;--grid:#e1e6ed;--on-ink:#f8fafc;
+  --c0:#0072b2;--c1:#d55e00;--c2:#009e73;--c3:#6a4c93;--c4:#9a7b00;--c5:#c2338a;
+  --font-display:"Instrument Serif","Iowan Old Style",Georgia,serif;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:light;box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0f1319;--plate:#161b23;--ink:#e8ecf2;--muted:#98a2b3;--line:#2a313c;--grid:#1c222b;--on-ink:#0f1319;
+  --c0:#4da3e0;--c1:#f28c4a;--c2:#2fc49b;--c3:#a68ad6;--c4:#d9b83a;--c5:#e86db5;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0f1319;--plate:#161b23;--ink:#e8ecf2;--muted:#98a2b3;--line:#2a313c;--grid:#1c222b;--on-ink:#0f1319;
+  --c0:#4da3e0;--c1:#f28c4a;--c2:#2fc49b;--c3:#a68ad6;--c4:#d9b83a;--c5:#e86db5;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 var(--font-body);
+  padding-block:24px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:960px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+header{padding-top:clamp(20px,6vw,56px);max-width:760px}
+h1{font:400 clamp(56px,11vw,110px)/.95 var(--font-display);letter-spacing:-.01em;margin:0}
+.lede{margin:14px 0 0;font-size:16px;max-width:54ch;color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:20px}
+a.card{display:flex;flex-direction:column;background:var(--plate);border:1px solid var(--line);border-radius:6px;color:inherit;text-decoration:none;overflow:hidden;transition:border-color .15s,transform .15s}
+a.card:hover{border-color:var(--ink);transform:translateY(-3px)}
+a.card:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.art{height:200px;position:relative;border-bottom:1px solid var(--line);background:var(--bg)}
+.art svg{position:absolute;inset:0;width:100%;height:100%}
+.art .gridlines{stroke:var(--grid);stroke-width:1}
+.body{padding:16px;display:flex;flex-direction:column;gap:8px;flex:1}
+.body h2{font:400 34px/1 var(--font-display);margin:0}
+.body p{margin:0;color:var(--muted);font-size:14px;max-width:44ch}
+.meta{margin-top:auto;padding-top:8px;display:flex;justify-content:space-between;align-items:center}
+.pill{font:500 12.5px var(--font-body);border:1px solid var(--ink);border-radius:4px;padding:5px 12px;background:var(--ink);color:var(--on-ink)}
+.mono{font:500 11px var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.soon{border:1px dashed var(--line);border-radius:6px;display:flex;align-items:center;justify-content:center;min-height:200px;text-align:center;padding:24px}
+.soon span{font:400 30px var(--font-display);color:var(--muted)}
+footer{color:var(--muted);font-size:12.5px;max-width:70ch}
+@media (prefers-reduced-motion:reduce){a.card{transition:none}a.card:hover{transform:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>AI Toys</h1>
+    <p class="lede">Small interactive things to poke at, so machine learning stops feeling like magic.</p>
+  </header>
+
+  <main class="grid">
+    <a class="card" href="./word_map.html">
+      <div class="art">
+        <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <g class="gridlines"><path d="M0 50H300M0 100H300M0 150H300M60 0V200M120 0V200M180 0V200M240 0V200"/></g>
+          <g stroke="var(--muted)" stroke-width="1.2" stroke-dasharray="3 4" fill="none">
+            <path d="M65 145L125 70L230 90M125 70L95 38"/><path d="M230 90L255 155"/>
+          </g>
+          <circle cx="65" cy="145" r="7" fill="var(--c0)"/>
+          <rect x="118" y="63" width="14" height="14" fill="var(--c1)"/>
+          <path d="M230 82L238 96H222Z" fill="var(--c2)"/>
+          <circle cx="255" cy="155" r="7" fill="var(--c3)"/>
+          <rect x="89" y="32" width="12" height="12" fill="var(--c5)" transform="rotate(45 95 38)"/>
+          <g font-family="IBM Plex Sans,system-ui,sans-serif" font-size="13" fill="var(--ink)">
+            <text x="76" y="165">king</text><text x="138" y="62">queen</text><text x="240" y="78">man</text><text x="225" y="178">woman</text><text x="106" y="32">crown</text>
+          </g>
+        </svg>
+      </div>
+      <div class="body">
+        <p class="mono">Language</p>
+        <h2>Word Map</h2>
+        <p>See how computers turn words into points in space, and which ones end up as neighbors.</p>
+        <div class="meta"><span class="pill">Open toy</span></div>
+      </div>
+    </a>
+
+    <a class="card" href="./style_transfer.html">
+      <div class="art">
+        <svg viewBox="0 0 300 200" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <g fill="none" stroke-linecap="round" stroke-width="10">
+            <path d="M-10 40Q60 0 120 50T240 40T320 20" stroke="var(--c4)" opacity=".85"/>
+            <path d="M-10 90Q70 50 130 100T250 90T320 70" stroke="var(--c0)" opacity=".85"/>
+            <path d="M-10 140Q60 100 120 150T240 140T320 120" stroke="var(--c2)" opacity=".85"/>
+            <path d="M-10 190Q80 160 140 195T320 175" stroke="var(--c3)" opacity=".85"/>
+          </g>
+          <rect x="105" y="62" width="90" height="76" rx="4" fill="var(--plate)" stroke="var(--ink)" stroke-width="1.2"/>
+          <path d="M118 126L145 94L162 114L172 104L184 126Z" fill="var(--ink)"/>
+          <circle cx="170" cy="80" r="6" fill="var(--c1)"/>
+        </svg>
+      </div>
+      <div class="body">
+        <p class="mono">Images</p>
+        <h2>Neural Style Transfer</h2>
+        <p>Repaint one photo in the style of another with a pretrained model, right in your browser.</p>
+        <div class="meta"><span class="pill">Open toy</span></div>
+      </div>
+    </a>
+
+    <div class="soon"><span>More toys on the way</span></div>
+  </main>
+
+  <footer>Everything here runs in your browser. Nothing is uploaded.</footer>
+</div>
+<!-- ait-feedback: visit counter + rating (Abacus API). Change NS to your own unique name. -->
+<style>
+.ait-fb{max-width:960px;margin:32px auto 0;padding:16px 4px 8px;border-top:1px solid rgba(128,128,128,.35);display:flex;flex-wrap:wrap;gap:10px 28px;align-items:center;justify-content:space-between;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:inherit;box-sizing:border-box}
+.ait-fb *{box-sizing:border-box}
+.ait-fb .ait-v{opacity:.8}
+.ait-fb .ait-v b{font-weight:700;opacity:1}
+.ait-fb .ait-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ait-fb .ait-stars{display:inline-flex}
+.ait-fb .ait-stars button{all:unset;cursor:pointer;font-size:24px;line-height:1;padding:2px 1px;color:currentColor;opacity:.28;transition:transform .1s}
+.ait-fb .ait-stars button.on{color:#e0a100;opacity:1}
+.ait-fb .ait-stars button:hover{transform:scale(1.15)}
+.ait-fb .ait-stars button:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:3px}
+.ait-fb .ait-stars.done button{cursor:default}
+.ait-fb .ait-stars.done button:hover{transform:none}
+.ait-fb .ait-t{opacity:.8}
+@media (prefers-reduced-motion:reduce){.ait-fb .ait-stars button{transition:none}}
+</style>
+<div class="ait-fb" id="aitFb" aria-label="Visits and rating">
+  <div class="ait-v" id="aitV">Visits: <b>…</b></div>
+  <div class="ait-r"><span class="ait-stars" id="aitS" role="group" aria-label="Rate this page"></span><span class="ait-t" id="aitT">Loading rating…</span></div>
+</div>
+<script>
+(function(){
+  var NS='aitoys-7k2q9x',PAGE='home',BASE='https://abacus.jasoncameron.dev/';
+  function store(){try{return window.localStorage}catch(e){return null}}
+  function sess(){try{return window.sessionStorage}catch(e){return null}}
+  function val(j){
+    if(!j)return null;
+    var v=j.count!=null?j.count:j.value!=null?j.value:(j.data&&j.data.up_count!=null?j.data.up_count:null);
+    return v==null?null:+v;
+  }
+  // act: 'up' adds one and returns the new value; '' just reads. A counter that does not exist yet reads as 0.
+  function hit(name,act){
+    return fetch(BASE+(act?'hit/':'get/')+NS+'/'+PAGE+'-'+name).then(function(r){
+      if(r.status===404)return 0;
+      if(!r.ok)throw new Error('http '+r.status);
+      return r.json().then(val);
+    });
+  }
+  var V=document.getElementById('aitV'),S=document.getElementById('aitS'),T=document.getElementById('aitT');
+  var fmt=function(n){return n==null?'–':Number(n).toLocaleString()};
+
+  /* visits: count once per browser session */
+  var ss=sess(),key='ait_visit_'+PAGE,seen=ss&&ss.getItem(key);
+  hit('visits',seen?'':'up').then(function(n){V.innerHTML='Visits: <b>'+fmt(n)+'</b>';if(ss&&!seen)ss.setItem(key,'1')})
+    .catch(function(){V.innerHTML='Visits: <b>–</b>'});
+
+  /* rating: five counters, one per star value */
+  var counts=[0,0,0,0,0],loaded=false,ls=store(),vkey='ait_rated_'+PAGE;
+  var mine=ls?+ls.getItem(vkey)||0:0,hover=0;
+  var btns=[];
+  for(var i=1;i<=5;i++)(function(n){
+    var b=document.createElement('button');b.type='button';b.textContent='★';b.setAttribute('aria-label',n+(n===1?' star':' stars'));
+    b.onclick=function(){vote(n)};
+    b.onmouseenter=function(){if(!mine){hover=n;paint()}};
+    b.onfocus=b.onmouseenter;
+    b.onmouseleave=b.onblur=function(){hover=0;paint()};
+    btns.push(b);S.appendChild(b);
+  })(i);
+  function stats(){
+    var tot=0,sum=0;counts.forEach(function(c,i){tot+=c;sum+=c*(i+1)});
+    return {tot:tot,avg:tot?sum/tot:0};
+  }
+  function paint(){
+    var st=stats(),shown=hover||mine||Math.round(st.avg);
+    btns.forEach(function(b,i){b.classList.toggle('on',i<shown)});
+    S.classList.toggle('done',!!mine);
+    if(!loaded){T.textContent='Rating unavailable';return}
+    T.textContent=(st.tot?st.avg.toFixed(1)+' / 5 · '+st.tot.toLocaleString()+(st.tot===1?' rating':' ratings'):'No ratings yet')+(mine?' · you gave '+mine+'★':'');
+  }
+  function vote(n){
+    if(mine||!loaded)return;
+    mine=n;counts[n-1]++;hover=0;paint();
+    if(ls)try{ls.setItem(vkey,String(n))}catch(e){}
+    hit('r'+n,'up').catch(function(){});
+  }
+  Promise.all([1,2,3,4,5].map(function(n){return hit('r'+n,'')})).then(function(a){
+    counts=a.map(function(x){return x||0});
+    if(mine&&!counts[mine-1])counts[mine-1]=1;
+    loaded=true;paint();
+  }).catch(function(){loaded=false;paint()});
+  paint();
+})();
+</script>
+</body>
+</html>
