@@ -175,7 +175,7 @@ async function ask(text) {
     await generator(messages, {
       max_new_tokens: 220,
       do_sample: true,
-      temperature: 1.2,
+      temperature: 100,
       top_k: 40,
       top_p: 0.95,
       repetition_penalty: 1.15,
