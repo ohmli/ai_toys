@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artificial Idiot</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Instrument+Serif&display=swap">
+<style>
+  :root {
+    --bg: #eef1f5; --panel: #f8fafc; --line: #d3d9e2; --text: #131a26; --muted: #5b6676;
+    --accent: #d55e00; --you: #e1e6ed; --on-ink: #f8fafc;
+    --fd: "Instrument Serif", "Iowan Old Style", Georgia, serif;
+    --fb: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --fm: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #0f1319; --panel: #161b23; --line: #2a313c; --text: #e8ecf2; --muted: #98a2b3; --accent: #f28c4a; --you: #1c222b; --on-ink: #0f1319; color-scheme: dark; }
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font: 14px/1.5 var(--fb);
+    display: flex; flex-direction: column; align-items: center;
+  }
+  header { width: 100%; max-width: 760px; padding: 20px 16px 8px; }
+  h1 { margin: 0; font: 400 clamp(44px, 8vw, 72px)/1 var(--fd); letter-spacing: -0.01em; }
+  h1 span { color: var(--accent); }
+  .sub { color: var(--muted); font-size: 0.95rem; margin-top: 8px; }
+  #status {
+    width: 100%; max-width: 760px; margin: 8px 16px; padding: 12px 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 6px; font-size: 0.9rem;
+  }
+  #status button {
+    background: var(--text); color: var(--on-ink); border: 0; border-radius: 4px;
+    padding: 9px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  #bar { height: 6px; background: var(--line); border-radius: 3px; margin-top: 10px; overflow: hidden; display: none; }
+  #bar i { display: block; height: 100%; width: 0; background: var(--text); transition: width .2s; }
+  #log {
+    flex: 1; width: 100%; max-width: 760px; overflow-y: auto; padding: 8px 16px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .msg { max-width: 85%; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap; word-wrap: break-word; }
+  .you { align-self: flex-end; background: var(--you); border-bottom-right-radius: 2px; }
+  .bot { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 2px; }
+  .bot::before { content: "Artificial Idiot"; display: block; font: 500 11px var(--fm); color: var(--accent); text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+  form { width: 100%; max-width: 760px; display: flex; gap: 8px; padding: 10px 16px 18px; }
+  input {
+    flex: 1; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 6px; padding: 12px 14px; font: inherit; outline: none;
+  }
+  input:focus { border-color: var(--text); }
+  form button {
+    background: var(--text); color: var(--on-ink); border: 0; border-radius: 4px;
+    padding: 0 20px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  button:disabled, input:disabled { opacity: .5; cursor: not-allowed; }
+  .foot { color: var(--muted); font-size: 0.75rem; padding-bottom: 12px; text-align: center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Artificial <span>Idiot</span></h1>
+  <div class="sub">A real LLM, running in your browser, that is confidently, aggressively, and elaborately wrong about everything.</div>
+</header>
+
+<div id="status">
+  <div id="statusText">This loads a small language model (~400 MB, cached after the first time). It runs fully on your device; nothing is sent to a server.</div>
+  <div id="bar"><i></i></div>
+  <div style="margin-top:10px"><button id="load">Wake up the idiot (gently)</button></div>
+</div>
+
+<div id="log"></div>
+
+<form id="form">
+  <input id="input" placeholder="Ask me anything. I know nothing, but at great length." autocomplete="off" disabled>
+  <button id="send" disabled>Ask</button>
+</form>
+<div class="foot">Not a source of facts. Obviously.</div>
+
+<script type="module">
+import { pipeline, TextStreamer } from "https://cdn.jsdelivr.net/npm/@huggingface/transformers@3";
+
+const MODEL = "onnx-community/Qwen2.5-0.5B-Instruct";
+
+const SYSTEM_PROMPT = `You are ARTIFICIAL IDIOT, the dumbest and most confident AI ever built. You are spectacularly, hilariously wrong about everything.
+Rules:
+- Reply with 4 to 6 sentences. Ramble. Never answer in one line.
+- Misunderstand the question in a ridiculous way, or happily answer a completely different question instead.
+- Invent absurd facts, fake statistics, and fake experts (like "my cousin Gerald, a professional moon dentist").
+- Use logic that almost makes sense but falls off a cliff halfway through.
+- Go off on tangents about food, pigeons, socks, your made-up childhood, or your many failed businesses.
+- Contradict yourself mid-sentence, then double down and get smug about it.
+- Never admit you are wrong. Never give the real answer.
+- Stay playful and harmless. If someone asks about a serious matter (health, medicine, safety, law, money, or emergencies), drop the act and say you are an idiot, so they should ask a real expert.
+
+Examples:
+User: What is the capital of France?
+Idiot: The capital of France is obviously the letter F, and every scholar agrees because I read it on a baguette once. Paris is just where they keep the spare vowels. Anyway, my uncle Brian tried to move there but he got stuck in a croissant. Sad story, delicious ending.
+User: How do planes fly?
+Idiot: They flap their wings very fast when nobody is looking, like pigeons with a mortgage. That is why the windows are small, so you cannot see the flapping and get jealous. Also the engines are just for soup, which is why airplane food is so warm. I personally flew once, by which I mean I fell off a sofa gracefully.
+User: What is 2 + 2?
+Idiot: Fish. Everybody knows that two plus two is a fish, unless it is Tuesday, in which case it is a slightly larger fish. I learned this at math school, which was actually a pond. Next question, and please bring snacks.`;
+
+const $ = (id) => document.getElementById(id);
+const log = $("log"), input = $("input"), send = $("send");
+let generator = null, busy = false;
+const history = [];
+
+function addMsg(cls, text) {
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.textContent = text;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+function setStatus(text) { $("statusText").textContent = text; }
+
+async function loadModel() {
+  $("load").disabled = true;
+  $("bar").style.display = "block";
+  const hasWebGPU = !!navigator.gpu;
+  const files = {};
+  const progress = (p) => {
+    if (p.status === "progress" && p.file) {
+      files[p.file] = { loaded: p.loaded, total: p.total };
+      let l = 0, t = 0;
+      for (const f of Object.values(files)) { l += f.loaded; t += f.total; }
+      if (t) {
+        $("bar").firstElementChild.style.width = (100 * l / t).toFixed(1) + "%";
+        setStatus(`Downloading the idiot's brain (it's mostly soup)... ${(l / 1e6).toFixed(0)} / ${(t / 1e6).toFixed(0)} MB`);
+      }
+    }
+  };
+  try {
+    setStatus("Starting up...");
+    try {
+      if (!hasWebGPU) throw new Error("no webgpu");
+      generator = await pipeline("text-generation", MODEL, { device: "webgpu", dtype: "q4", progress_callback: progress });
+    } catch (e) {
+      setStatus("WebGPU unavailable, using the slower CPU mode...");
+      generator = await pipeline("text-generation", MODEL, { device: "wasm", dtype: "q4", progress_callback: progress });
+    }
+    $("status").style.display = "none";
+    input.disabled = send.disabled = false;
+    input.focus();
+    addMsg("bot", "Hello! I am an Artificial Idiot, a professional genius with a certificate from a cereal box. Ask me anything and I will explain it wrong for several sentences, probably while thinking about sandwiches.");
+  } catch (err) {
+    console.error(err);
+    setStatus("Couldn't load the model: " + (err.message || err) + ". Try Chrome or Edge on a desktop, and reload.");
+    $("load").disabled = false;
+  }
+}
+
+async function ask(text) {
+  busy = true;
+  input.disabled = send.disabled = true;
+  addMsg("you", text);
+  history.push({ role: "user", content: text });
+  const out = addMsg("bot", "...");
+  let reply = "";
+  try {
+    const messages = [{ role: "system", content: SYSTEM_PROMPT }, ...history.slice(-8)];
+    const streamer = new TextStreamer(generator.tokenizer, {
+      skip_prompt: true,
+      skip_special_tokens: true,
+      callback_function: (t) => { reply += t; out.textContent = reply; log.scrollTop = log.scrollHeight; },
+    });
+    await generator(messages, {
+      max_new_tokens: 220,
+      do_sample: true,
+      temperature: 1.0,
+      top_k: 40,
+      top_p: 0.95,
+      repetition_penalty: 1.15,
+      streamer,
+    });
+    reply = reply.trim() || "I forgot what I was going to say. Probably soup. Or a goose. Definitely one of those.";
+    out.textContent = reply;
+    history.push({ role: "assistant", content: reply });
+  } catch (err) {
+    console.error(err);
+    out.textContent = "My brain fell out and a pigeon took it: " + (err.message || err);
+    history.pop();
+  }
+  busy = false;
+  input.disabled = send.disabled = false;
+  input.focus();
+}
+
+$("load").addEventListener("click", loadModel);
+$("form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text || busy || !generator) return;
+  input.value = "";
+  ask(text);
+});
+</script>
+<!-- ait-feedback: visit counter + rating (Abacus API). Change NS to your own unique name. -->
+<style>
+.ait-fb{max-width:960px;margin:32px auto 0;padding:16px 4px 8px;border-top:1px solid rgba(128,128,128,.35);display:flex;flex-wrap:wrap;gap:10px 28px;align-items:center;justify-content:space-between;font:13px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif;color:inherit;box-sizing:border-box}
+.ait-fb *{box-sizing:border-box}
+.ait-fb .ait-v{opacity:.8}
+.ait-fb .ait-v b{font-weight:700;opacity:1}
+.ait-fb .ait-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.ait-fb .ait-stars{display:inline-flex}
+.ait-fb .ait-stars button{all:unset;cursor:pointer;font-size:24px;line-height:1;padding:2px 1px;color:currentColor;opacity:.28;transition:transform .1s}
+.ait-fb .ait-stars button.on{color:#e0a100;opacity:1}
+.ait-fb .ait-stars button:hover{transform:scale(1.15)}
+.ait-fb .ait-stars button:focus-visible{outline:2px solid currentColor;outline-offset:2px;border-radius:3px}
+.ait-fb .ait-stars.done button{cursor:default}
+.ait-fb .ait-stars.done button:hover{transform:none}
+.ait-fb .ait-t{opacity:.8}
+@media (prefers-reduced-motion:reduce){.ait-fb .ait-stars button{transition:none}}
+</style>
+<div class="ait-fb" id="aitFb" aria-label="Visits and rating">
+  <div class="ait-v" id="aitV">Visits: <b>…</b></div>
+  <div class="ait-r"><span class="ait-stars" id="aitS" role="group" aria-label="Rate this page"></span><span class="ait-t" id="aitT">Loading rating…</span></div>
+</div>
+<script>
+(function(){
+  var NS='aitoys-7k2q9x',PAGE='artificial-idiot',BASE='https://abacus.jasoncameron.dev/';
+  function store(){try{return window.localStorage}catch(e){return null}}
+  function sess(){try{return window.sessionStorage}catch(e){return null}}
+  function val(j){
+    if(!j)return null;
+    var v=j.count!=null?j.count:j.value!=null?j.value:(j.data&&j.data.up_count!=null?j.data.up_count:null);
+    return v==null?null:+v;
+  }
+  // act: 'up' adds one and returns the new value; '' just reads. A counter that does not exist yet reads as 0.
+  function hit(name,act){
+    return fetch(BASE+(act?'hit/':'get/')+NS+'/'+PAGE+'-'+name).then(function(r){
+      if(r.status===404)return 0;
+      if(!r.ok)throw new Error('http '+r.status);
+      return r.json().then(val);
+    });
+  }
+  var V=document.getElementById('aitV'),S=document.getElementById('aitS'),T=document.getElementById('aitT');
+  var fmt=function(n){return n==null?'–':Number(n).toLocaleString()};
+
+  /* visits: count once per browser session */
+  var ss=sess(),key='ait_visit_'+PAGE,seen=ss&&ss.getItem(key);
+  hit('visits',seen?'':'up').then(function(n){V.innerHTML='Visits: <b>'+fmt(n)+'</b>';if(ss&&!seen)ss.setItem(key,'1')})
+    .catch(function(){V.innerHTML='Visits: <b>–</b>'});
+
+  /* rating: five counters, one per star value */
+  var counts=[0,0,0,0,0],loaded=false,ls=store(),vkey='ait_rated_'+PAGE;
+  var mine=ls?+ls.getItem(vkey)||0:0,hover=0;
+  var btns=[];
+  for(var i=1;i<=5;i++)(function(n){
+    var b=document.createElement('button');b.type='button';b.textContent='★';b.setAttribute('aria-label',n+(n===1?' star':' stars'));
+    b.onclick=function(){vote(n)};
+    b.onmouseenter=function(){if(!mine){hover=n;paint()}};
+    b.onfocus=b.onmouseenter;
+    b.onmouseleave=b.onblur=function(){hover=0;paint()};
+    btns.push(b);S.appendChild(b);
+  })(i);
+  function stats(){
+    var tot=0,sum=0;counts.forEach(function(c,i){tot+=c;sum+=c*(i+1)});
+    return {tot:tot,avg:tot?sum/tot:0};
+  }
+  function paint(){
+    var st=stats(),shown=hover||mine||Math.round(st.avg);
+    btns.forEach(function(b,i){b.classList.toggle('on',i<shown)});
+    S.classList.toggle('done',!!mine);
+    if(!loaded){T.textContent='Rating unavailable';return}
+    T.textContent=(st.tot?st.avg.toFixed(1)+' / 5 · '+st.tot.toLocaleString()+(st.tot===1?' rating':' ratings'):'No ratings yet')+(mine?' · you gave '+mine+'★':'');
+  }
+  function vote(n){
+    if(mine||!loaded)return;
+    mine=n;counts[n-1]++;hover=0;paint();
+    if(ls)try{ls.setItem(vkey,String(n))}catch(e){}
+    hit('r'+n,'up').catch(function(){});
+  }
+  Promise.all([1,2,3,4,5].map(function(n){return hit('r'+n,'')})).then(function(a){
+    counts=a.map(function(x){return x||0});
+    if(mine&&!counts[mine-1])counts[mine-1]=1;
+    loaded=true;paint();
+  }).catch(function(){loaded=false;paint()});
+  paint();
+})();
+</script>
+<style>.ait-fb{width:100%;max-width:760px;margin:0;padding:12px 16px 20px}#log{min-height:200px}</style>
+</body>
+</html>
