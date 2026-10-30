@@ -173,9 +173,9 @@ async function ask(text) {
       callback_function: (t) => { reply += t; out.textContent = reply; log.scrollTop = log.scrollHeight; },
     });
     await generator(messages, {
-      max_new_tokens: 220,
+      max_new_tokens: 500,
       do_sample: true,
-      temperature: 100,
+      temperature: 1.2,
       top_k: 40,
       top_p: 0.95,
       repetition_penalty: 1.15,
